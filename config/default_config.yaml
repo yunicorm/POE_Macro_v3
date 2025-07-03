@@ -40,6 +40,15 @@ screen_capture:
     width: 1920
     height: 1080
 
+# Tincture module settings
+tincture:
+  enabled: true
+  key: "3"
+  monitor_config: "Primary"
+  sensitivity: 0.7
+  check_interval: 0.1  # seconds
+  min_use_interval: 0.5  # seconds
+
 # Log monitoring settings
 log_monitor:
   enabled: false
