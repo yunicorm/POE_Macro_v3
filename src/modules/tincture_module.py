@@ -9,9 +9,9 @@ from enum import Enum
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-from src.features.image_recognition import TinctureDetector
-from src.utils.keyboard_input import KeyboardController
-from src.core.config_manager import ConfigManager
+from ..features.image_recognition import TinctureDetector
+from ..utils.keyboard_input import KeyboardController
+from ..core.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 

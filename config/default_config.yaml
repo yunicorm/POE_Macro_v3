@@ -19,17 +19,46 @@ hotkeys:
 # Flask module settings
 flask:
   enabled: true
-  duration: 5000  # milliseconds
-  cooldown: 1000  # milliseconds
+  slot_1:
+    enabled: true
+    name: "Granite Flask"
+    key: "1"
+    duration: 7.2
+    loop_delay: [7.21, 7.30]
+  slot_2:
+    enabled: true
+    name: "Cinderswallow Urn"
+    key: "2"
+    duration: 7.2
+    loop_delay: [7.21, 7.30]
+  slot_4:
+    enabled: true
+    name: "Wine of the Prophet"
+    key: "4"
+    duration: 20.0
+    loop_delay: [20.0, 21.0]
+  slot_5:
+    enabled: true
+    name: "Divine Mana Flask"
+    key: "5"
+    duration: 5.0
+    loop_delay: [4.5, 4.8]
 
 # Skill module settings
 skills:
   enabled: true
-  skill_list:
-    - key: "Q"
-      cooldown: 1000
-    - key: "W"
-      cooldown: 2000
+  berserk:
+    enabled: true
+    key: "e"
+    interval: [0.3, 1.0]
+  molten_shell:
+    enabled: true
+    key: "r"
+    interval: [0.3, 1.0]
+  order_to_me:
+    enabled: true
+    key: "t"
+    interval: [3.5, 4.0]
 
 # Screen capture settings
 screen_capture:
