@@ -1,5 +1,5 @@
 """
--������
+設定管理モジュール
 """
 import yaml
 import logging
@@ -9,7 +9,7 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 class ConfigManager:
-    """-�ա�뒡Y���"""
+    """設定ファイルを管理するクラス"""
     
     def __init__(self, config_path: str = "config/default_config.yaml"):
         self.config_path = Path(config_path)
@@ -17,15 +17,14 @@ class ConfigManager:
         self.user_config_path = Path("config/user_config.yaml")
         
     def load_config(self) -> Dict[str, Any]:
-        """-�ա�뒭��"""
+        """設定ファイルを読み込む"""
         try:
-            # �թ��-����
+            # デフォルト設定を読み込み
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 self.config = yaml.safe_load(f)
             logger.info(f"Loaded default config from {self.config_path}")
             
-            # ����-�LB�p
-�M
+            # ユーザー設定があれば上書き
             if self.user_config_path.exists():
                 with open(self.user_config_path, 'r', encoding='utf-8') as f:
                     user_config = yaml.safe_load(f)
@@ -39,7 +38,7 @@ class ConfigManager:
             raise
     
     def save_user_config(self) -> None:
-        """�(n-������-�hWf�X"""
+        """現在の設定をユーザー設定として保存"""
         try:
             self.user_config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.user_config_path, 'w', encoding='utf-8') as f:
@@ -50,7 +49,7 @@ class ConfigManager:
             raise
     
     def _merge_config(self, base: Dict, override: Dict) -> None:
-        """-���0�k���"""
+        """設定を再帰的にマージ"""
         for key, value in override.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                 self._merge_config(base[key], value)
@@ -59,8 +58,8 @@ class ConfigManager:
     
     def get(self, key_path: str, default: Any = None) -> Any:
         """
-        ���:�n��ѹg-�$�֗
-        �: get("flasks.slot_1.key") -> "1"
+        ドット区切りのキーパスで設定値を取得
+        例: get("flasks.slot_1.key") -> "1"
         """
         keys = key_path.split('.')
         value = self.config
@@ -72,3 +71,17 @@ class ConfigManager:
                 return default
                 
         return value
+    
+    def set(self, key_path: str, value: Any) -> None:
+        """
+        ドット区切りのキーパスで設定値を設定
+        """
+        keys = key_path.split('.')
+        config = self.config
+        
+        for key in keys[:-1]:
+            if key not in config:
+                config[key] = {}
+            config = config[key]
+            
+        config[keys[-1]] = value

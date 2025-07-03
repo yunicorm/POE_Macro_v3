@@ -21,11 +21,13 @@ Path of Exile自動化マクロ v3.0の開発記録
 
 ### 2025-01-16
 - [x] 基本モジュールの実装
-  - [x] src/utils/keyboard_input.py - アンチチート対策キーボード制御
-  - [x] src/utils/screen_capture.py - マルチモニター対応画面キャプチャ
+  - [x] src/utils/keyboard_input.py - アンチチート対策付きキーボード制御
+  - [x] src/utils/screen_capture.py - マルチモニター対応画面キャプチャ  
   - [x] src/utils/image_recognition.py - OpenCVテンプレートマッチング
-  - [x] src/core/config_manager.py - YAML設定管理
+  - [x] src/core/config_manager.py - 設定ファイル管理
   - [x] src/modules/flask_module.py - フラスコ自動使用基本実装
+- [x] test_modules.py作成
+- [x] ファイルエンコーディング問題の修正
 - [x] 全必要__init__.pyファイルの作成
 
 ## 現在の作業

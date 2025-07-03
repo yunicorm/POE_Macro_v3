@@ -1,5 +1,5 @@
 """
-�鹳��(����
+フラスコ自動使用モジュール
 """
 import threading
 import time
@@ -12,7 +12,7 @@ from ..utils.keyboard_input import KeyboardController
 logger = logging.getLogger(__name__)
 
 class FlaskModule:
-    """�鹳��(��Y���"""
+    """フラスコ自動使用を制御するクラス"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
@@ -21,14 +21,14 @@ class FlaskModule:
         self.threads = []
         
     def start(self):
-        """�鹳��ג��"""
+        """フラスコ自動使用を開始"""
         if self.running:
             logger.warning("Flask module already running")
             return
             
         self.running = True
         
-        # �鹳����n��ג��
+        # フラスコスロットごとに自動使用を開始
         for slot_name, slot_config in self.config.items():
             if slot_config.get('enabled', False):
                 thread = threading.Thread(
@@ -41,7 +41,7 @@ class FlaskModule:
                 logger.info(f"Started flask loop for {slot_name}")
     
     def stop(self):
-        """�鹳��ג\b"""
+        """フラスコ自動使用を停止"""
         self.running = False
         for thread in self.threads:
             thread.join(timeout=1.0)
@@ -49,19 +49,19 @@ class FlaskModule:
         logger.info("Flask module stopped")
     
     def _flask_loop(self, slot_name: str, config: Dict[str, Any]):
-        """%�鹳n����"""
+        """個別フラスコのループ処理"""
         key = config['key']
         loop_delay = config['loop_delay']
         
-        # ޟL
+        # 初回使用
         self.keyboard.press_key(key)
         
         while self.running:
-            # ����jE�
+            # ランダム遅延
             delay = random.uniform(loop_delay[0], loop_delay[1])
             logger.debug(f"{slot_name}: Waiting {delay:.3f}s before next use")
             
-            # 0KD��g��ïWf\b�Bk �O��
+            # 短時間間隔でチェックして停止要求に迅速に対応
             for _ in range(int(delay * 10)):
                 if not self.running:
                     break
