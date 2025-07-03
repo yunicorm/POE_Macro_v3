@@ -15,10 +15,11 @@ logger = logging.getLogger(__name__)
 class MainWindow(QMainWindow):
     """メインGUIウィンドウクラス"""
     
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, macro_controller=None):
         super().__init__()
         self.config_manager = config_manager
         self.config = config_manager.load_config()
+        self.macro_controller = macro_controller
         
         self.setWindowTitle("POE Macro v3.0")
         self.setGeometry(100, 100, 800, 600)
@@ -243,17 +244,25 @@ class MainWindow(QMainWindow):
     def start_macro(self):
         """マクロを開始"""
         try:
-            self.start_btn.setEnabled(False)
-            self.stop_btn.setEnabled(True)
-            self.statusBar().showMessage("マクロ実行中")
-            self.log_message("マクロを開始しました")
+            if self.macro_controller:
+                self.macro_controller.start()
+                self.start_btn.setEnabled(False)
+                self.stop_btn.setEnabled(True)
+                self.statusBar().showMessage("マクロ実行中")
+                self.log_message("マクロを開始しました")
+            else:
+                self.log_message("マクロコントローラーが初期化されていません")
             
         except Exception as e:
             self.log_message(f"マクロ開始エラー: {e}")
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
     
     def stop_macro(self):
         """マクロを停止"""
         try:
+            if self.macro_controller:
+                self.macro_controller.stop()
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
             self.statusBar().showMessage("Ready")
@@ -265,7 +274,11 @@ class MainWindow(QMainWindow):
     def manual_use_tincture(self):
         """Tinctureを手動使用"""
         try:
-            self.log_message("Tincture手動使用を実行しました")
+            if self.macro_controller:
+                self.macro_controller.manual_tincture_use()
+                self.log_message("Tincture手動使用を実行しました")
+            else:
+                self.log_message("マクロコントローラーが初期化されていません")
             
         except Exception as e:
             self.log_message(f"Tincture手動使用エラー: {e}")
@@ -285,8 +298,41 @@ class MainWindow(QMainWindow):
     def update_status(self):
         """ステータスを定期更新"""
         try:
-            # ここで実際のモジュールからステータスを取得
-            pass
+            if self.macro_controller:
+                status = self.macro_controller.get_status()
+                
+                # Tincture統計の更新
+                if 'tincture' in status and hasattr(self, 'tincture_uses_label'):
+                    tincture_stats = status['tincture'].get('stats', {})
+                    
+                    uses = tincture_stats.get('total_uses', 0)
+                    self.tincture_uses_label.setText(f"使用回数: {uses}")
+                    
+                    success = tincture_stats.get('detection_success', 0)
+                    self.detection_success_label.setText(f"検出成功: {success}")
+                    
+                    failed = tincture_stats.get('detection_failed', 0)
+                    self.detection_failed_label.setText(f"検出失敗: {failed}")
+                    
+                    last_use = tincture_stats.get('last_use')
+                    if last_use:
+                        import datetime
+                        dt = datetime.datetime.fromtimestamp(last_use)
+                        self.last_use_label.setText(f"最後の使用: {dt.strftime('%H:%M:%S')}")
+                
+                # ステータスバーの更新
+                if status.get('running', False):
+                    if not hasattr(self, '_last_running_status') or not self._last_running_status:
+                        self.statusBar().showMessage("マクロ実行中")
+                        self.start_btn.setEnabled(False)
+                        self.stop_btn.setEnabled(True)
+                        self._last_running_status = True
+                else:
+                    if not hasattr(self, '_last_running_status') or self._last_running_status:
+                        self.statusBar().showMessage("Ready")
+                        self.start_btn.setEnabled(True)
+                        self.stop_btn.setEnabled(False)
+                        self._last_running_status = False
             
         except Exception as e:
             logger.error(f"Status update error: {e}")
@@ -321,7 +367,7 @@ def main():
         from src.core.config_manager import ConfigManager
         config_manager = ConfigManager()
         
-        window = MainWindow(config_manager)
+        window = MainWindow(config_manager, None)
         window.show()
         
         return app.exec_()
