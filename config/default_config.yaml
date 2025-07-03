@@ -1,0 +1,46 @@
+# POE Macro v3.0 Default Configuration
+
+# General settings
+general:
+  debug_mode: false
+  log_level: INFO
+  language: ja
+
+# Hotkey settings
+hotkeys:
+  toggle_macro: F1
+  emergency_stop: F12
+  flask_1: "1"
+  flask_2: "2"
+  flask_3: "3"
+  flask_4: "4"
+  flask_5: "5"
+
+# Flask module settings
+flask:
+  enabled: true
+  duration: 5000  # milliseconds
+  cooldown: 1000  # milliseconds
+
+# Skill module settings
+skills:
+  enabled: true
+  skill_list:
+    - key: "Q"
+      cooldown: 1000
+    - key: "W"
+      cooldown: 2000
+
+# Screen capture settings
+screen_capture:
+  monitor_index: 0
+  capture_area:
+    x: 0
+    y: 0
+    width: 1920
+    height: 1080
+
+# Log monitoring settings
+log_monitor:
+  enabled: false
+  log_path: "C:/Program Files (x86)/Grinding Gear Games/Path of Exile/logs/Client.txt"
