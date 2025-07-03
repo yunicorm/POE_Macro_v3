@@ -74,19 +74,17 @@ def main():
     # GUI アプリケーションの準備
     app = QApplication(sys.argv)
     
-    # TODO: GUI実装後にコメントアウトを削除
-    # from gui.main_window import MainWindow
-    # main_window = MainWindow()
-    # main_window.show()
+    # GUI実装完了 - MainWindowを起動
+    from gui.main_window import MainWindow
+    main_window = MainWindow()
+    main_window.show()
     
     logger.info("POE Macro v3.0 started successfully!")
     logger.info("Press Ctrl+C to exit...")
     
     try:
-        # TODO: GUI実装後にapp.exec_()を使用
-        # return app.exec_()
-        input("Press Enter to exit...")
-        return 0
+        # GUI実装完了 - PyQt5のイベントループを開始
+        return app.exec_()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         return 0
