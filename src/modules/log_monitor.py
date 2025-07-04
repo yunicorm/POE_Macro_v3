@@ -325,9 +325,16 @@ class LogMonitor:
         """マクロを有効化"""
         if self.macro_controller and not self.macro_controller.running:
             try:
-                self.macro_controller.start()
+                # Grace Period待機が有効かチェック
+                if hasattr(self.macro_controller, 'grace_period_enabled') and self.macro_controller.grace_period_enabled:
+                    logger.info("Activating macro with Grace Period wait")
+                    self.macro_controller.start(wait_for_input=True)
+                else:
+                    logger.info("Activating macro normally (Grace Period disabled)")
+                    self.macro_controller.start()
+                
                 self.stats['macro_activations'] += 1
-                logger.info("Macro activated by log monitor")
+                logger.info("Macro activation initiated by log monitor")
             except Exception as e:
                 logger.error(f"Failed to activate macro: {e}")
                 

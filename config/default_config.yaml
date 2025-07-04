@@ -6,6 +6,15 @@ general:
   log_level: INFO
   language: ja
 
+# Grace Period settings
+grace_period:
+  enabled: true  # Wait for player input after entering combat areas
+  wait_keys:     # Keys that will end the grace period
+    - left_click
+    - right_click
+    - middle_click
+    - q
+
 # Hotkey settings
 hotkeys:
   toggle_macro: F1

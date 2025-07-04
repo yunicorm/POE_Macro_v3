@@ -79,11 +79,23 @@ class MainWindow(QMainWindow):
         
         self.macro_enabled_cb = QCheckBox("マクロを有効化")
         self.macro_enabled_cb.setChecked(True)
-        macro_layout.addWidget(self.macro_enabled_cb, 0, 0)
+        macro_layout.addWidget(self.macro_enabled_cb, 0, 0, 1, 2)
         
-        macro_layout.addWidget(QLabel("緊急停止キー:"), 1, 0)
-        self.emergency_key_edit = QLineEdit("F12")
-        macro_layout.addWidget(self.emergency_key_edit, 1, 1)
+        self.grace_period_cb = QCheckBox("エリア入場後のプレイヤー入力を待機 (Grace Period)")
+        grace_period_enabled = self.config.get('grace_period', {}).get('enabled', True)
+        self.grace_period_cb.setChecked(grace_period_enabled)
+        self.grace_period_cb.setToolTip("戦闘エリアに入場後、左/右/中クリックまたはQキーの入力を待ってからマクロを開始します")
+        macro_layout.addWidget(self.grace_period_cb, 1, 0, 1, 2)
+        
+        macro_layout.addWidget(QLabel("緊急停止キー:"), 2, 0)
+        self.emergency_key_edit = QLineEdit("Ctrl+Shift+F12")
+        self.emergency_key_edit.setReadOnly(True)
+        macro_layout.addWidget(self.emergency_key_edit, 2, 1)
+        
+        macro_layout.addWidget(QLabel("トグルキー:"), 3, 0)
+        self.toggle_key_edit = QLineEdit("F12")
+        self.toggle_key_edit.setReadOnly(True)
+        macro_layout.addWidget(self.toggle_key_edit, 3, 1)
         
         layout.addWidget(macro_group)
         
@@ -115,6 +127,127 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         
         self.tab_widget.addTab(widget, "一般")
+    
+    def create_tincture_tab(self):
+        """Tincture設定タブを作成"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # Tincture設定グループ
+        tincture_group = QGroupBox("Tincture自動使用設定")
+        tincture_layout = QGridLayout(tincture_group)
+        
+        self.tincture_enabled_cb = QCheckBox("Tincture自動使用を有効化")
+        tincture_enabled = self.config.get('tincture', {}).get('enabled', True)
+        self.tincture_enabled_cb.setChecked(tincture_enabled)
+        tincture_layout.addWidget(self.tincture_enabled_cb, 0, 0, 1, 2)
+        
+        tincture_layout.addWidget(QLabel("使用キー:"), 1, 0)
+        self.tincture_key_edit = QLineEdit()
+        tincture_key = self.config.get('tincture', {}).get('key', '3')
+        self.tincture_key_edit.setText(tincture_key)
+        tincture_layout.addWidget(self.tincture_key_edit, 1, 1)
+        
+        tincture_layout.addWidget(QLabel("モニター設定:"), 2, 0)
+        self.monitor_combo = QComboBox()
+        self.monitor_combo.addItems(["Primary", "Center", "Right"])
+        monitor_config = self.config.get('tincture', {}).get('monitor_config', 'Primary')
+        self.monitor_combo.setCurrentText(monitor_config)
+        tincture_layout.addWidget(self.monitor_combo, 2, 1)
+        
+        tincture_layout.addWidget(QLabel("検出感度:"), 3, 0)
+        self.sensitivity_slider = QSlider(Qt.Horizontal)
+        self.sensitivity_slider.setRange(50, 100)
+        sensitivity = int(self.config.get('tincture', {}).get('sensitivity', 0.7) * 100)
+        self.sensitivity_slider.setValue(sensitivity)
+        self.sensitivity_slider.valueChanged.connect(self.update_sensitivity_label)
+        tincture_layout.addWidget(self.sensitivity_slider, 3, 1)
+        
+        self.sensitivity_label = QLabel(f"{sensitivity / 100:.2f}")
+        tincture_layout.addWidget(self.sensitivity_label, 3, 2)
+        
+        # 詳細設定
+        tincture_layout.addWidget(QLabel("チェック間隔(ms):"), 4, 0)
+        self.check_interval_spinbox = QSpinBox()
+        self.check_interval_spinbox.setRange(50, 1000)  # 50ms～1000ms
+        check_interval = int(self.config.get('tincture', {}).get('check_interval', 0.1) * 1000)
+        self.check_interval_spinbox.setValue(check_interval)
+        tincture_layout.addWidget(self.check_interval_spinbox, 4, 1)
+        
+        tincture_layout.addWidget(QLabel("最小使用間隔(ms):"), 5, 0)
+        self.min_use_interval_spinbox = QSpinBox()
+        self.min_use_interval_spinbox.setRange(100, 5000)  # 100ms～5000ms
+        min_use_interval = int(self.config.get('tincture', {}).get('min_use_interval', 0.5) * 1000)
+        self.min_use_interval_spinbox.setValue(min_use_interval)
+        tincture_layout.addWidget(self.min_use_interval_spinbox, 5, 1)
+        
+        layout.addWidget(tincture_group)
+        
+        # 統計情報グループ
+        stats_group = QGroupBox("統計情報")
+        stats_layout = QGridLayout(stats_group)
+        
+        self.tincture_uses_label = QLabel("使用回数: 0")
+        stats_layout.addWidget(self.tincture_uses_label, 0, 0)
+        
+        self.detection_success_label = QLabel("検出成功: 0")
+        stats_layout.addWidget(self.detection_success_label, 0, 1)
+        
+        self.detection_failed_label = QLabel("検出失敗: 0")
+        stats_layout.addWidget(self.detection_failed_label, 1, 0)
+        
+        self.last_use_label = QLabel("最後の使用: なし")
+        stats_layout.addWidget(self.last_use_label, 1, 1)
+        
+        layout.addWidget(stats_group)
+        
+        # ボタン
+        button_layout = QHBoxLayout()
+        
+        self.manual_use_btn = QPushButton("手動使用")
+        self.manual_use_btn.clicked.connect(self.manual_use_tincture)
+        button_layout.addWidget(self.manual_use_btn)
+        
+        self.reset_stats_btn = QPushButton("統計リセット")
+        self.reset_stats_btn.clicked.connect(self.reset_tincture_stats)
+        button_layout.addWidget(self.reset_stats_btn)
+        
+        layout.addLayout(button_layout)
+        
+        # 設定保存・適用ボタン
+        settings_button_layout = QHBoxLayout()
+        
+        # 一般設定の保存ボタンを追加
+        save_general_btn = QPushButton("設定を保存")
+        save_general_btn.clicked.connect(self.save_general_settings)
+        save_general_btn.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }")
+        button_layout.addWidget(save_general_btn)
+        
+        layout.addLayout(button_layout)
+        layout.addStretch()
+        
+        self.tab_widget.addTab(widget, "一般")
+    
+    def save_general_settings(self):
+        """一般設定を保存"""
+        try:
+            # Grace Period設定を保存
+            if 'grace_period' not in self.config:
+                self.config['grace_period'] = {}
+            self.config['grace_period']['enabled'] = self.grace_period_cb.isChecked()
+            
+            # 設定を保存
+            self.config_manager.save_config(self.config)
+            
+            # MacroControllerに反映
+            if self.macro_controller:
+                self.macro_controller.grace_period_enabled = self.grace_period_cb.isChecked()
+            
+            self.log_message("一般設定を保存しました")
+            
+        except Exception as e:
+            self.log_message(f"一般設定保存エラー: {e}")
+            logger.error(f"Error saving general settings: {e}")
     
     def create_tincture_tab(self):
         """Tincture設定タブを作成"""
@@ -896,7 +1029,11 @@ class MainWindow(QMainWindow):
                         self.last_use_label.setText(f"最後の使用: {dt.strftime('%H:%M:%S')}")
                 
                 # ステータスバーの更新
-                if status.get('running', False):
+                if status.get('waiting_for_input', False):
+                    self.statusBar().showMessage("Grace Period - プレイヤー入力待機中...")
+                    self.start_btn.setEnabled(False)
+                    self.stop_btn.setEnabled(True)
+                elif status.get('running', False):
                     if not hasattr(self, '_last_running_status') or not self._last_running_status:
                         self.statusBar().showMessage("マクロ実行中")
                         self.start_btn.setEnabled(False)

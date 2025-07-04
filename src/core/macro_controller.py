@@ -89,10 +89,13 @@ class MacroController:
         # 制御状態
         self.running = False
         self.emergency_stop = False
+        self.waiting_for_input = False  # Grace Period待機状態
+        self.grace_period_enabled = config.get('grace_period', {}).get('enabled', True)
         
         # グローバルホットキーリスナー
         self.hotkey_listener = None
         self.toggle_listener = None  # F12トグル用リスナー
+        self.input_listener = None  # Grace Period入力検知用リスナー
         
         # MainWindowとの同期用コールバック
         self.status_changed_callback = None
@@ -102,10 +105,21 @@ class MacroController:
         
         logger.info("MacroController initialized successfully")
         
-    def start(self):
-        """全マクロモジュールを開始"""
+    def start(self, wait_for_input=False):
+        """全マクロモジュールを開始
+        
+        Args:
+            wait_for_input: True の場合、Grace Period待機状態に入る
+        """
         if self.running:
             logger.warning("MacroController already running")
+            return
+        
+        # Grace Period待機が有効で、待機指定がある場合
+        if self.grace_period_enabled and wait_for_input:
+            logger.info("Entering Grace Period wait state...")
+            self.waiting_for_input = True
+            self._setup_input_listener()
             return
             
         try:
@@ -243,6 +257,15 @@ class MacroController:
         if self.toggle_listener:
             self.toggle_listener.stop()
             self.toggle_listener = None
+        if self.input_listener:
+            self.input_listener.stop()
+            self.input_listener = None
+        if hasattr(self, 'mouse_listener') and self.mouse_listener:
+            self.mouse_listener.stop()
+            self.mouse_listener = None
+        
+        # 待機状態をリセット
+        self.waiting_for_input = False
         
         logger.info("MacroController stopped")
         
@@ -251,7 +274,11 @@ class MacroController:
     
     def toggle(self):
         """マクロの開始/停止をトグル"""
-        if self.running:
+        # Grace Period待機中の場合は即座に開始
+        if self.waiting_for_input:
+            logger.info("Toggling macro ON (ending Grace Period)")
+            self._end_grace_period()
+        elif self.running:
             logger.info("Toggling macro OFF")
             self.stop()
         else:
@@ -326,6 +353,8 @@ class MacroController:
             
             return {
                 'running': self.running,
+                'waiting_for_input': self.waiting_for_input,
+                'grace_period_enabled': self.grace_period_enabled,
                 'emergency_stop': self.emergency_stop,
                 'flask': {
                     'running': self.flask_module.running,
@@ -421,6 +450,67 @@ class MacroController:
         self.toggle_listener.start()
         
         logger.info("Hotkeys registered - Toggle: F12, Emergency stop: Ctrl+Shift+F12")
+    
+    def _setup_input_listener(self):
+        """Grace Period入力検知リスナーを設定"""
+        if self.input_listener:
+            self.input_listener.stop()
+            self.input_listener = None
+        
+        logger.info("Setting up Grace Period input listener...")
+        
+        def on_click(x, y, button, pressed):
+            """マウスクリック検知"""
+            if not pressed or not self.waiting_for_input:
+                return
+            
+            # 左、右、中央クリックを検知
+            if button in [pynput.mouse.Button.left, pynput.mouse.Button.right, pynput.mouse.Button.middle]:
+                logger.info(f"Grace Period ended by {button.name} click")
+                self._end_grace_period()
+                return False  # リスナーを停止
+        
+        def on_press(key):
+            """キーボード入力検知"""
+            if not self.waiting_for_input:
+                return
+            
+            # Qキーを検知
+            try:
+                if hasattr(key, 'char') and key.char and key.char.lower() == 'q':
+                    logger.info("Grace Period ended by Q key")
+                    self._end_grace_period()
+                    return False  # リスナーを停止
+            except Exception as e:
+                logger.error(f"Error in key detection: {e}")
+        
+        # マウスリスナー
+        self.mouse_listener = pynput.mouse.Listener(on_click=on_click)
+        self.mouse_listener.daemon = True
+        self.mouse_listener.start()
+        
+        # キーボードリスナー
+        self.input_listener = pynput.keyboard.Listener(on_press=on_press)
+        self.input_listener.daemon = True
+        self.input_listener.start()
+        
+        logger.info("Grace Period input listener started - waiting for left/right/middle click or Q key")
+    
+    def _end_grace_period(self):
+        """Grace Period待機を終了して通常のマクロ開始"""
+        self.waiting_for_input = False
+        
+        # 入力リスナーを停止
+        if hasattr(self, 'mouse_listener') and self.mouse_listener:
+            self.mouse_listener.stop()
+            self.mouse_listener = None
+        if self.input_listener:
+            self.input_listener.stop()
+            self.input_listener = None
+        
+        # 通常のマクロ開始
+        logger.info("Grace Period ended, starting macro normally")
+        self.start(wait_for_input=False)
     
     def manual_flask_use(self, slot: str):
         """手動でフラスコを使用"""
