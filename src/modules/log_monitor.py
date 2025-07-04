@@ -35,23 +35,31 @@ class LogMonitor:
         self.in_area = False
         self.current_area = None
         
-        # ログパターン
+        # ログパターン（実際のClient.txtの形式に合わせて修正）
         self.area_enter_pattern = re.compile(
-            r'.*Entering area.*|.*You have entered.*|.*Entered area.*', 
+            r'.*You have entered (.+)\.$', 
             re.IGNORECASE
         )
         self.area_exit_pattern = re.compile(
-            r'.*Leaving area.*|.*You have left.*|.*Left area.*', 
+            r'.*You have left (.+)\.$', 
             re.IGNORECASE
         )
-        self.hideout_pattern = re.compile(
-            r'.*hideout.*|.*Hideout.*', 
-            re.IGNORECASE
-        )
-        self.town_pattern = re.compile(
-            r'.*town.*|.*Town.*|.*Lioneye.*|.*Highgate.*|.*Oriath.*', 
-            re.IGNORECASE
-        )
+        
+        # 安全エリア（マクロを自動ONにしない）リスト
+        self.safe_areas = {
+            # Act拠点（実際のエリア名）
+            "lioneye's watch",  # Act1 & Act6
+            "the forest encampment",  # Act2
+            "the sarn encampment",  # Act3 & Act8
+            "highgate",  # Act4 & Act9
+            "overseer's tower",  # Act5
+            "the bridge encampment",  # Act7
+            "oriath docks",  # Act10
+            
+            # エンドゲーム拠点
+            "karui shore",
+            "kingsmarch",
+        }
         
         # 統計情報
         self.stats = {
@@ -245,8 +253,11 @@ class LogMonitor:
         logger.info(f"Entered area: {self.current_area}")
         
         # 安全なエリア（町・隠れ家）以外でマクロを有効化
-        if not self._is_safe_area(line):
+        if not self._is_safe_area(self.current_area):
             self._activate_macro()
+            logger.info(f"Macro activated for area: {self.current_area}")
+        else:
+            logger.info(f"Safe area detected, macro not activated: {self.current_area}")
             
         # コールバック実行
         if self.on_area_enter:
@@ -280,31 +291,35 @@ class LogMonitor:
                 
     def _extract_area_name(self, line: str) -> str:
         """ログ行からエリア名を抽出"""
-        # 簡単な抽出ロジック（実際のログ形式に応じて調整）
         try:
-            if '"' in line:
-                # "エリア名" 形式
-                start = line.find('"') + 1
-                end = line.find('"', start)
-                if end > start:
-                    return line[start:end]
+            # "You have entered [エリア名]." 形式から抽出
+            match = self.area_enter_pattern.search(line)
+            if match:
+                return match.group(1).strip()
             
-            # その他の形式
-            words = line.split()
-            for i, word in enumerate(words):
-                if word.lower() in ['area', 'entering', 'entered']:
-                    if i + 1 < len(words):
-                        return words[i + 1]
-                        
+            # "You have left [エリア名]." 形式から抽出
+            match = self.area_exit_pattern.search(line)
+            if match:
+                return match.group(1).strip()
+                
         except Exception as e:
             logger.error(f"Error extracting area name: {e}")
             
         return "Unknown Area"
         
-    def _is_safe_area(self, line: str) -> bool:
+    def _is_safe_area(self, area_name: str) -> bool:
         """安全なエリア（町・隠れ家）かどうかを判定"""
-        return (self.hideout_pattern.search(line) or 
-                self.town_pattern.search(line))
+        if not area_name:
+            return False
+            
+        area_lower = area_name.lower()
+        
+        # Hideoutは部分一致で判定
+        if "hideout" in area_lower:
+            return True
+            
+        # その他の安全エリアは完全一致で判定
+        return area_lower in self.safe_areas
                 
     def _activate_macro(self):
         """マクロを有効化"""
@@ -327,11 +342,29 @@ class LogMonitor:
                 logger.error(f"Failed to deactivate macro: {e}")
                 
     def manual_test_area_enter(self, area_name: str = "Test Area"):
-        """手動でエリア入場をテスト"""
-        test_line = f'Entering area "{area_name}"'
+        """手動でエリア入場をテスト（実際のログ形式）"""
+        test_line = f'2025/07/05 06:07:24 113538687 cff945b9 [INFO Client 14940] : You have entered {area_name}.'
         self._parse_log_entry(test_line)
         
     def manual_test_area_exit(self, area_name: str = "Test Area"):
-        """手動でエリア退場をテスト"""
-        test_line = f'Leaving area "{area_name}"'
+        """手動でエリア退場をテスト（実際のログ形式）"""
+        test_line = f'2025/07/05 06:07:24 113538687 cff945b9 [INFO Client 14940] : You have left {area_name}.'
         self._parse_log_entry(test_line)
+        
+    def test_safe_area_detection(self):
+        """安全エリア検出のテスト"""
+        test_areas = [
+            "Lioneye's Watch",  # 安全エリア
+            "The Sarn Encampment",  # 安全エリア
+            "Highgate",  # 安全エリア
+            "My Hideout",  # 安全エリア（Hideout）
+            "The Twilight Strand",  # 通常エリア
+            "Aspirants' Plaza",  # 通常エリア
+        ]
+        
+        logger.info("Testing safe area detection:")
+        for area in test_areas:
+            is_safe = self._is_safe_area(area)
+            logger.info(f"  {area}: {'SAFE' if is_safe else 'NORMAL'}")
+            
+        return test_areas
