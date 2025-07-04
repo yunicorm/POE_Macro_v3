@@ -10,6 +10,14 @@ import re
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
+# Grace Period機能用インポート
+try:
+    from pynput import mouse, keyboard
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    PYNPUT_AVAILABLE = False
+    mouse, keyboard = None, None
+
 logger = logging.getLogger(__name__)
 
 class LogMonitor:
@@ -73,6 +81,18 @@ class LogMonitor:
         # コールバック
         self.on_area_enter = None
         self.on_area_exit = None
+        
+        # Grace Period設定
+        self.grace_period_config = config.get('grace_period', {})
+        self.grace_period_enabled = self.grace_period_config.get('enabled', False)
+        self.wait_for_input = self.grace_period_config.get('wait_for_input', True)
+        self.trigger_inputs = self.grace_period_config.get('trigger_inputs', ['mouse_left', 'mouse_right', 'mouse_middle', 'q'])
+        
+        # Grace Period状態管理
+        self.grace_period_active = False
+        self.input_listeners = []
+        self.current_area_needs_grace = False
+        self.grace_period_completed_areas = set()  # 一度入力を検知したエリアを記録
         
     def _find_client_log_path(self) -> str:
         """POE Client.txtファイルのパスを自動検出"""
@@ -254,8 +274,20 @@ class LogMonitor:
         
         # 安全なエリア（町・隠れ家）以外でマクロを有効化
         if not self._is_safe_area(self.current_area):
-            self._activate_macro()
-            logger.info(f"Macro activated for area: {self.current_area}")
+            # Grace Period機能が有効かチェック
+            if self.grace_period_enabled and self.wait_for_input:
+                # 一度入力を検知したエリアは即座に開始
+                area_id = f"{self.current_area}_{int(time.time() // 3600)}"  # 1時間ごとにリセット
+                if area_id in self.grace_period_completed_areas:
+                    logger.info(f"Area previously completed grace period, starting macro immediately: {self.current_area}")
+                    self._activate_macro()
+                else:
+                    logger.info(f"Entering grace period - waiting for player input...")
+                    self.current_area_needs_grace = True
+                    self._start_grace_period()
+            else:
+                self._activate_macro()
+                logger.info(f"Macro activated for area: {self.current_area}")
         else:
             logger.info(f"Safe area detected, macro not activated: {self.current_area}")
             
@@ -278,6 +310,9 @@ class LogMonitor:
         self.stats['last_area_change'] = time.time()
         
         logger.info(f"Left area: {old_area}")
+        
+        # Grace Period状態をリセット
+        self._stop_grace_period()
         
         # マクロを無効化
         self._deactivate_macro()
@@ -325,14 +360,7 @@ class LogMonitor:
         """マクロを有効化"""
         if self.macro_controller and not self.macro_controller.running:
             try:
-                # Grace Period待機が有効かチェック
-                if hasattr(self.macro_controller, 'grace_period_enabled') and self.macro_controller.grace_period_enabled:
-                    logger.info("Activating macro with Grace Period wait")
-                    self.macro_controller.start(wait_for_input=True)
-                else:
-                    logger.info("Activating macro normally (Grace Period disabled)")
-                    self.macro_controller.start()
-                
+                self.macro_controller.start()
                 self.stats['macro_activations'] += 1
                 logger.info("Macro activation initiated by log monitor")
             except Exception as e:
@@ -358,6 +386,154 @@ class LogMonitor:
         test_line = f'2025/07/05 06:07:24 113538687 cff945b9 [INFO Client 14940] : You have left {area_name}.'
         self._parse_log_entry(test_line)
         
+    def _start_grace_period(self):
+        """Grace Period（入力待機）を開始"""
+        if not PYNPUT_AVAILABLE:
+            logger.warning("pynput not available, Grace Period disabled")
+            self._activate_macro()
+            return
+            
+        if self.grace_period_active:
+            return  # 既に待機中
+            
+        self.grace_period_active = True
+        
+        try:
+            # 入力監視開始
+            self._start_input_monitoring()
+            logger.info("Grace Period started - waiting for player input...")
+            
+        except Exception as e:
+            logger.error(f"Error starting Grace Period: {e}")
+            self.grace_period_active = False
+            self._activate_macro()  # フォールバック
+    
+    def _stop_grace_period(self):
+        """Grace Period（入力待機）を停止"""
+        if not self.grace_period_active:
+            return
+            
+        self.grace_period_active = False
+        self.current_area_needs_grace = False
+        
+        # 入力監視を停止
+        self._stop_input_monitoring()
+        
+        logger.info("Grace Period stopped")
+    
+    def _start_input_monitoring(self):
+        """入力監視を開始"""
+        if not PYNPUT_AVAILABLE:
+            return
+            
+        try:
+            # マウス監視
+            if any(trigger in ['mouse_left', 'mouse_right', 'mouse_middle'] for trigger in self.trigger_inputs):
+                mouse_listener = mouse.Listener(
+                    on_click=self._on_mouse_click
+                )
+                mouse_listener.start()
+                self.input_listeners.append(mouse_listener)
+                logger.debug("Mouse input monitoring started")
+            
+            # キーボード監視
+            keyboard_triggers = [trigger for trigger in self.trigger_inputs if trigger not in ['mouse_left', 'mouse_right', 'mouse_middle']]
+            if keyboard_triggers:
+                keyboard_listener = keyboard.Listener(
+                    on_press=self._on_key_press
+                )
+                keyboard_listener.start()
+                self.input_listeners.append(keyboard_listener)
+                logger.debug(f"Keyboard input monitoring started for keys: {keyboard_triggers}")
+                
+        except Exception as e:
+            logger.error(f"Error starting input monitoring: {e}")
+    
+    def _stop_input_monitoring(self):
+        """入力監視を停止"""
+        for listener in self.input_listeners:
+            try:
+                listener.stop()
+            except Exception as e:
+                logger.error(f"Error stopping input listener: {e}")
+                
+        self.input_listeners.clear()
+        logger.debug("Input monitoring stopped")
+    
+    def _on_mouse_click(self, x, y, button, pressed):
+        """マウスクリック時の処理"""
+        if not pressed or not self.grace_period_active:
+            return
+            
+        try:
+            button_name = button.name if hasattr(button, 'name') else str(button)
+            input_type = f"mouse_{button_name}"
+            
+            if input_type in self.trigger_inputs:
+                self._on_grace_period_input(input_type)
+                
+        except Exception as e:
+            logger.error(f"Error handling mouse click: {e}")
+    
+    def _on_key_press(self, key):
+        """キー押下時の処理"""
+        if not self.grace_period_active:
+            return
+            
+        try:
+            # キーの文字列表現を取得
+            if hasattr(key, 'char') and key.char:
+                key_str = key.char.lower()
+            elif hasattr(key, 'name'):
+                key_str = key.name.lower()
+            else:
+                key_str = str(key).lower()
+            
+            if key_str in self.trigger_inputs:
+                self._on_grace_period_input(key_str)
+                
+        except Exception as e:
+            logger.error(f"Error handling key press: {e}")
+    
+    def _on_grace_period_input(self, input_type: str):
+        """Grace Period中の入力検知時の処理"""
+        if not self.grace_period_active:
+            return
+            
+        logger.info(f"Player input detected ({input_type}) - starting macro")
+        
+        # 現在のエリアを完了済みとして記録
+        if self.current_area:
+            area_id = f"{self.current_area}_{int(time.time() // 3600)}"
+            self.grace_period_completed_areas.add(area_id)
+        
+        # Grace Period終了
+        self._stop_grace_period()
+        
+        # マクロ開始
+        self._activate_macro()
+    
+    def manual_test_grace_period(self):
+        """Grace Period機能の手動テスト"""
+        logger.info("=== Grace Period Manual Test ===")
+        logger.info(f"Grace Period enabled: {self.grace_period_enabled}")
+        logger.info(f"Wait for input: {self.wait_for_input}")
+        logger.info(f"Trigger inputs: {self.trigger_inputs}")
+        logger.info(f"pynput available: {PYNPUT_AVAILABLE}")
+        
+        if not PYNPUT_AVAILABLE:
+            logger.warning("pynput not available - Grace Period will be disabled")
+            return
+            
+        # テスト用エリア入場
+        self.manual_test_area_enter("Test Combat Area")
+        
+        if self.grace_period_active:
+            logger.info("Grace Period is active - waiting for input...")
+            logger.info(f"Trigger any of these inputs: {self.trigger_inputs}")
+        else:
+            logger.info("Grace Period not activated (check configuration)")
+    
     def test_safe_area_detection(self):
         """安全エリア検出のテスト"""
         test_areas = [

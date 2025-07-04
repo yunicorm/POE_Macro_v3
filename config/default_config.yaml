@@ -6,14 +6,15 @@ general:
   log_level: INFO
   language: ja
 
-# Grace Period settings
+# Grace period settings (待機時間設定)
 grace_period:
-  enabled: true  # Wait for player input after entering combat areas
-  wait_keys:     # Keys that will end the grace period
-    - left_click
-    - right_click
-    - middle_click
-    - q
+  enabled: true
+  wait_for_input: true  # プレイヤー入力を待つ
+  trigger_inputs:       # マクロ開始のトリガーとなる入力
+    - "mouse_left"      # 左クリック
+    - "mouse_right"     # 右クリック
+    - "mouse_middle"    # 中クリック
+    - "q"               # Qキー
 
 # Hotkey settings
 hotkeys:
