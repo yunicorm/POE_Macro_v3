@@ -7,7 +7,7 @@ import random
 import logging
 from typing import Dict, Any
 
-from ..utils.keyboard_input import KeyboardController
+from utils.keyboard_input import KeyboardController
 
 logger = logging.getLogger(__name__)
 

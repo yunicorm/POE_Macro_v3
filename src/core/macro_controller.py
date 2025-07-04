@@ -6,10 +6,10 @@ import pynput
 import threading
 from typing import Dict, Any, Optional
 
-from ..modules.flask_module import FlaskModule
-from ..modules.skill_module import SkillModule
-from ..modules.tincture_module import TinctureModule
-from .config_manager import ConfigManager
+from modules.flask_module import FlaskModule
+from modules.skill_module import SkillModule
+from modules.tincture_module import TinctureModule
+from core.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 

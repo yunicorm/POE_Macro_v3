@@ -59,19 +59,19 @@ def test_modules():
     try:
         # 設定管理のテスト
         config_manager = ConfigManager()
-        logger.info("✓ ConfigManager initialized")
+        logger.info("[OK] ConfigManager initialized")
         
         # キーボード制御のテスト
         keyboard = KeyboardController()
-        logger.info("✓ KeyboardController initialized")
+        logger.info("[OK] KeyboardController initialized")
         
         # 画面キャプチャのテスト
         screen_capture = ScreenCapture()
-        logger.info("✓ ScreenCapture initialized")
+        logger.info("[OK] ScreenCapture initialized")
         
         # 画像認識のテスト
         image_recognition = ImageRecognition()
-        logger.info("✓ ImageRecognition initialized")
+        logger.info("[OK] ImageRecognition initialized")
         
         logger.info("All modules initialized successfully!")
         
