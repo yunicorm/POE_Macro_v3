@@ -40,6 +40,10 @@ class SkillModule:
         
         # スキルごとに自動使用を開始
         for skill_name, skill_config in self.config.items():
+            # 'enabled'キーや辞書でない項目をスキップ
+            if skill_name == 'enabled' or not isinstance(skill_config, dict):
+                continue
+                
             if skill_config.get('enabled', False):
                 thread = threading.Thread(
                     target=self._skill_loop,

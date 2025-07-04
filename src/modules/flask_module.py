@@ -35,6 +35,10 @@ class FlaskModule:
         
         # フラスコスロットごとに自動使用を開始
         for slot_name, slot_config in self.config.items():
+            # 'enabled'キーや辞書でない項目をスキップ
+            if slot_name == 'enabled' or not isinstance(slot_config, dict):
+                continue
+                
             if slot_config.get('enabled', False):
                 thread = threading.Thread(
                     target=self._flask_loop,
