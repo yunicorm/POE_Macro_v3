@@ -32,7 +32,6 @@ class TinctureDetector:
         """
         self.monitor_config = monitor_config
         self.sensitivity = max(0.5, min(1.0, sensitivity))
-        self.sct = mss.mss()
         self.area_selector = area_selector
         
         # モニター設定の検証
@@ -91,16 +90,17 @@ class TinctureDetector:
             else:
                 capture_area = self._get_fallback_area()
             
-            # スクリーンショットを撮影
-            screenshot = self.sct.grab(capture_area)
-            
-            # numpy配列に変換
-            img_array = np.array(screenshot)
-            
-            # BGRに変換（OpenCV形式）
-            img_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
-            
-            return img_bgr
+            # スクリーンショットを撮影（新しいmssインスタンスを使用）
+            with mss.mss() as sct:
+                screenshot = sct.grab(capture_area)
+                
+                # numpy配列に変換
+                img_array = np.array(screenshot)
+                
+                # BGRに変換（OpenCV形式）
+                img_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
+                
+                return img_bgr
             
         except Exception as e:
             logger.error(f"Failed to capture screen: {e}")
@@ -109,24 +109,26 @@ class TinctureDetector:
     def _get_fallback_area(self) -> Dict[str, int]:
         """フォールバック用の検出エリアを取得"""
         try:
-            # モニターを選択
-            monitor_index = self.MONITOR_CONFIGS[self.monitor_config]
-            if monitor_index >= len(self.sct.monitors) - 1:
-                monitor_index = 0  # プライマリモニターにフォールバック
-            
-            monitor = self.sct.monitors[monitor_index + 1]  # monitors[0]は全画面
-            
-            # 画面右上部分のみキャプチャ（Tinctureアイコンの位置）
-            width = monitor['width']
-            height = monitor['height']
-            
-            # 右上の約1/4エリアをキャプチャ（従来の方式）
-            return {
-                'top': monitor['top'],
-                'left': monitor['left'] + width // 2,
-                'width': width // 2,
-                'height': height // 4
-            }
+            # モニター情報を取得（新しいmssインスタンスを使用）
+            with mss.mss() as sct:
+                # モニターを選択
+                monitor_index = self.MONITOR_CONFIGS[self.monitor_config]
+                if monitor_index >= len(sct.monitors) - 1:
+                    monitor_index = 0  # プライマリモニターにフォールバック
+                
+                monitor = sct.monitors[monitor_index + 1]  # monitors[0]は全画面
+                
+                # 画面右上部分のみキャプチャ（Tinctureアイコンの位置）
+                width = monitor['width']
+                height = monitor['height']
+                
+                # 右上の約1/4エリアをキャプチャ（従来の方式）
+                return {
+                    'top': monitor['top'],
+                    'left': monitor['left'] + width // 2,
+                    'width': width // 2,
+                    'height': height // 4
+                }
             
         except Exception as e:
             logger.error(f"Failed to get fallback area: {e}")

@@ -423,3 +423,67 @@ python test_comprehensive.py
 - **エラーハンドリング**: より堅牢なエラー処理
 - **コード可読性**: 不要な複雑性を排除
 - **メンテナンス性**: シンプルで理解しやすい構造に改善
+
+## 2025-07-04 bool型エラー包括修正作業
+
+### MacroController bool型設定エラー修正
+- [x] **MacroController.start()メソッドの包括的修正**
+  - [x] 詳細なトレースバック付きエラーログ追加
+  - [x] 設定構造の詳細デバッグログ追加
+  - [x] config全体がdictでない場合のフォールバック処理
+  - [x] 各モジュール設定取得時のisinstance()チェック強化
+  - [x] bool型やstring型のenabled値に対応
+
+- [x] **全モジュールでの型チェック強化**
+  - [x] TinctureModule.__init__(): config引数の型チェック追加
+  - [x] TinctureModule.update_config(): new_config引数の型チェック追加
+  - [x] SkillModule.__init__(): config引数の型チェック追加
+  - [x] SkillModule.update_config(): config引数の型チェック追加
+  - [x] FlaskModule.__init__(): config引数の型チェック追加
+
+- [x] **ConfigManagerデバッグ強化**
+  - [x] 設定読み込み時の詳細構造ログ
+  - [x] 各モジュール設定の型・値詳細出力
+  - [x] マージ処理の詳細トレース
+  - [x] 最終設定構造の確認ログ
+
+### FlaskModule/SkillModule start()メソッド修正
+- [x] **FlaskModule.start()のbool型エラー修正**
+  - [x] 問題原因特定: self.config.items()で'enabled': Trueペアが処理される
+  - [x] 'enabled'キーのスキップ条件追加
+  - [x] isinstance(slot_config, dict)チェック追加
+  - [x] 設定構造の柔軟性向上
+
+- [x] **SkillModule.start()の同様問題修正**
+  - [x] skills.enabled: Trueの同じエラーパターン発見
+  - [x] 'enabled'キーと非dict値のスキップ処理
+  - [x] isinstance(skill_config, dict)チェック追加
+
+### TinctureDetectorスレッドセーフティ修正
+- [x] **mssライブラリのスレッド競合問題解決**
+  - [x] 問題特定: '_thread._local' object has no attribute 'srcdc'
+  - [x] 原因特定: 複数スレッドでの共有mssインスタンス使用
+  - [x] self.sct = mss.mss()の削除（__init__メソッド）
+  - [x] _capture_screen()メソッドでwith mss.mss() as sct:使用
+  - [x] _get_fallback_area()メソッドでwith mss.mss() as sct:使用
+  - [x] スレッドセーフな実装への完全移行
+
+### デバッグ・検証機能強化
+- [x] **包括的テストスイート作成**
+  - [x] test_macro_controller_bool_fix.py: bool型設定テスト
+  - [x] test_flask_skill_bool_fix.py: モジュールstart()メソッドテスト
+  - [x] test_tincture_thread_safety.py: スレッドセーフティ検証
+  - [x] test_config_debug.py: 設定関連包括デバッグ
+
+- [x] **ログレベル調整**
+  - [x] main.py: 一時的にDEBUGレベル設定
+  - [x] 詳細なエラー特定のための情報収集
+  - [x] 問題原因の正確な把握
+
+### 修正効果と成果
+- [x] **'bool' object has no attribute 'get'エラー完全解決**
+- [x] **'_thread._local' object has no attribute 'srcdc'エラー完全解決**
+- [x] **設定構造の堅牢性向上**: 不正な型の設定値への耐性
+- [x] **マルチスレッド安定性**: TinctureModuleの正常動作確保
+- [x] **フォールバック処理**: エラー時も継続動作可能
+- [x] **デバッグ容易性**: 詳細ログによる問題特定迅速化
