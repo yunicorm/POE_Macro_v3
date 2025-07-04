@@ -6,7 +6,8 @@
       "Bash(mkdir:*)",
       "Bash(python3 -m pip install:*)",
       "Bash(python3:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

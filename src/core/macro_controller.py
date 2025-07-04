@@ -74,9 +74,25 @@ class MacroController:
             # デバッグ: config構造を確認
             logger.debug(f"Start - Config type: {type(self.config)}")
             logger.debug(f"Start - Config keys: {self.config.keys() if isinstance(self.config, dict) else 'Not a dict'}")
-            logger.debug(f"Start - Flask config: {self.config.get('flask', 'NOT FOUND') if isinstance(self.config, dict) else 'Config not dict'}")
-            logger.debug(f"Start - Skills config: {self.config.get('skills', 'NOT FOUND') if isinstance(self.config, dict) else 'Config not dict'}")
-            logger.debug(f"Start - Tincture config: {self.config.get('tincture', 'NOT FOUND') if isinstance(self.config, dict) else 'Config not dict'}")
+            
+            # configがdictでない場合の処理
+            if not isinstance(self.config, dict):
+                logger.error(f"Config is not a dict, it's {type(self.config)}: {self.config}")
+                self.config = {
+                    'flask': {'enabled': False},
+                    'skills': {'enabled': False},
+                    'tincture': {'enabled': False}
+                }
+                logger.info("Using fallback config")
+            
+            # 各設定値のタイプと内容をデバッグ出力
+            flask_raw = self.config.get('flask', {})
+            skills_raw = self.config.get('skills', {})
+            tincture_raw = self.config.get('tincture', {})
+            
+            logger.debug(f"Start - Flask config raw: {flask_raw} (type: {type(flask_raw)})")
+            logger.debug(f"Start - Skills config raw: {skills_raw} (type: {type(skills_raw)})")
+            logger.debug(f"Start - Tincture config raw: {tincture_raw} (type: {type(tincture_raw)})")
             
             self.running = True
             self.emergency_stop = False
@@ -85,31 +101,41 @@ class MacroController:
             logger.info("Starting macro modules...")
             
             # flask設定の安全な取得
-            flask_config = self.config.get('flask', {}) if isinstance(self.config, dict) else {}
-            logger.debug(f"Retrieved flask_config: {flask_config} (type: {type(flask_config)})")
-            if isinstance(flask_config, dict) and flask_config.get('enabled', False):
-                self.flask_module.start()
-                logger.info("Flask module started")
+            flask_config = flask_raw if isinstance(flask_raw, dict) else {}
+            if flask_config:
+                # enabledキーがbool値の場合の対応
+                flask_enabled = flask_config.get('enabled', False)
+                if flask_enabled is True or (isinstance(flask_enabled, str) and flask_enabled.lower() == 'true'):
+                    self.flask_module.start()
+                    logger.info("Flask module started")
+                else:
+                    logger.info(f"Flask module not started - enabled: {flask_enabled}")
             else:
-                logger.info(f"Flask module not started - enabled: {flask_config.get('enabled', False) if isinstance(flask_config, dict) else 'config not dict'}")
+                logger.info("Flask module not started - no valid config")
             
             # skills設定の安全な取得
-            skills_config = self.config.get('skills', {}) if isinstance(self.config, dict) else {}
-            logger.debug(f"Retrieved skills_config: {skills_config} (type: {type(skills_config)})")
-            if isinstance(skills_config, dict) and skills_config.get('enabled', False):
-                self.skill_module.start()
-                logger.info("Skill module started")
+            skills_config = skills_raw if isinstance(skills_raw, dict) else {}
+            if skills_config:
+                skills_enabled = skills_config.get('enabled', False)
+                if skills_enabled is True or (isinstance(skills_enabled, str) and skills_enabled.lower() == 'true'):
+                    self.skill_module.start()
+                    logger.info("Skill module started")
+                else:
+                    logger.info(f"Skill module not started - enabled: {skills_enabled}")
             else:
-                logger.info(f"Skill module not started - enabled: {skills_config.get('enabled', False) if isinstance(skills_config, dict) else 'config not dict'}")
+                logger.info("Skill module not started - no valid config")
             
             # tincture設定の安全な取得
-            tincture_config = self.config.get('tincture', {}) if isinstance(self.config, dict) else {}
-            logger.debug(f"Retrieved tincture_config: {tincture_config} (type: {type(tincture_config)})")
-            if isinstance(tincture_config, dict) and tincture_config.get('enabled', False):
-                self.tincture_module.start()
-                logger.info("Tincture module started")
+            tincture_config = tincture_raw if isinstance(tincture_raw, dict) else {}
+            if tincture_config:
+                tincture_enabled = tincture_config.get('enabled', False)
+                if tincture_enabled is True or (isinstance(tincture_enabled, str) and tincture_enabled.lower() == 'true'):
+                    self.tincture_module.start()
+                    logger.info("Tincture module started")
+                else:
+                    logger.info(f"Tincture module not started - enabled: {tincture_enabled}")
             else:
-                logger.info(f"Tincture module not started - enabled: {tincture_config.get('enabled', False) if isinstance(tincture_config, dict) else 'config not dict'}")
+                logger.info("Tincture module not started - no valid config")
             
             # 緊急停止ホットキーの設定
             self._setup_emergency_stop()
@@ -169,20 +195,35 @@ class MacroController:
         if config is None:
             config = self.config_manager.load_config()
         
+        # configがdictでない場合の処理
+        if not isinstance(config, dict):
+            logger.error(f"Config is not a dict in update_config, it's {type(config)}")
+            config = {
+                'flask': {'enabled': False},
+                'skills': {'enabled': False},
+                'tincture': {'enabled': False}
+            }
+        
         self.config = config
         
         # 各モジュールの設定更新（安全な取得）
         flask_config = config.get('flask', {})
         if isinstance(flask_config, dict):
             self.flask_module.update_config(flask_config)
+        else:
+            logger.warning(f"Flask config is not dict in update_config: {type(flask_config)}")
         
         skills_config = config.get('skills', {})
         if isinstance(skills_config, dict):
             self.skill_module.update_config(skills_config)
+        else:
+            logger.warning(f"Skills config is not dict in update_config: {type(skills_config)}")
         
         tincture_config = config.get('tincture', {})
         if isinstance(tincture_config, dict):
             self.tincture_module.update_config(tincture_config)
+        else:
+            logger.warning(f"Tincture config is not dict in update_config: {type(tincture_config)}")
         
         logger.info("Configuration updated")
     
