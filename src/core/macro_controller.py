@@ -45,15 +45,21 @@ class MacroController:
             # 各モジュールの開始
             logger.info("Starting macro modules...")
             
-            if self.config.get('flask', {}).get('enabled', False):
+            # flask設定の安全な取得
+            flask_config = self.config.get('flask', {})
+            if isinstance(flask_config, dict) and flask_config.get('enabled', False):
                 self.flask_module.start()
                 logger.info("Flask module started")
             
-            if self.config.get('skills', {}).get('enabled', False):
+            # skills設定の安全な取得
+            skills_config = self.config.get('skills', {})
+            if isinstance(skills_config, dict) and skills_config.get('enabled', False):
                 self.skill_module.start()
                 logger.info("Skill module started")
             
-            if self.config.get('tincture', {}).get('enabled', False):
+            # tincture設定の安全な取得
+            tincture_config = self.config.get('tincture', {})
+            if isinstance(tincture_config, dict) and tincture_config.get('enabled', False):
                 self.tincture_module.start()
                 logger.info("Tincture module started")
             
@@ -117,34 +123,59 @@ class MacroController:
         
         self.config = config
         
-        # 各モジュールの設定更新
-        self.flask_module.update_config(config.get('flask', {}))
-        self.skill_module.update_config(config.get('skills', {}))
-        self.tincture_module.update_config(config.get('tincture', {}))
+        # 各モジュールの設定更新（安全な取得）
+        flask_config = config.get('flask', {})
+        if isinstance(flask_config, dict):
+            self.flask_module.update_config(flask_config)
+        
+        skills_config = config.get('skills', {})
+        if isinstance(skills_config, dict):
+            self.skill_module.update_config(skills_config)
+        
+        tincture_config = config.get('tincture', {})
+        if isinstance(tincture_config, dict):
+            self.tincture_module.update_config(tincture_config)
         
         logger.info("Configuration updated")
     
     def get_status(self) -> Dict[str, Any]:
         """全モジュールのステータスを取得"""
-        return {
-            'running': self.running,
-            'emergency_stop': self.emergency_stop,
-            'flask': {
-                'running': self.flask_module.running,
-                'threads': len(self.flask_module.threads)
-            },
-            'skill': {
-                'running': self.skill_module.running,
-                'threads': len(self.skill_module.threads),
-                'stats': self.skill_module.get_stats()
-            },
-            'tincture': {
-                'running': self.tincture_module.running,
-                'detection_active': self.tincture_module.detection_active,
-                'current_state': self.tincture_module.current_state.name if hasattr(self.tincture_module, 'current_state') else 'UNKNOWN',
-                'stats': self.tincture_module.get_stats()
+        try:
+            # Tincture モジュールの統計情報を安全に取得
+            tincture_stats = {}
+            try:
+                tincture_stats = self.tincture_module.get_stats()
+            except Exception as e:
+                logger.warning(f"Failed to get tincture stats: {e}")
+                tincture_stats = {'total_uses': 0, 'stats': {}}
+            
+            return {
+                'running': self.running,
+                'emergency_stop': self.emergency_stop,
+                'flask': {
+                    'running': self.flask_module.running,
+                    'threads': len(self.flask_module.threads)
+                },
+                'skill': {
+                    'running': self.skill_module.running,
+                    'threads': len(self.skill_module.threads),
+                    'stats': self.skill_module.get_stats()
+                },
+                'tincture': {
+                    'running': self.tincture_module.running,
+                    'current_state': 'RUNNING' if self.tincture_module.running else 'STOPPED',
+                    'stats': tincture_stats
+                }
             }
-        }
+        except Exception as e:
+            logger.error(f"Failed to get status: {e}")
+            return {
+                'running': self.running,
+                'emergency_stop': self.emergency_stop,
+                'flask': {'running': False, 'threads': 0},
+                'skill': {'running': False, 'threads': 0, 'stats': {}},
+                'tincture': {'running': False, 'current_state': 'ERROR', 'stats': {}}
+            }
     
     def _setup_emergency_stop(self):
         """緊急停止ホットキー（F12）を設定"""
@@ -164,10 +195,23 @@ class MacroController:
     
     def manual_flask_use(self, slot: str):
         """手動でフラスコを使用"""
-        key = self.config.get('flask', {}).get(slot, {}).get('key')
-        if key:
-            self.flask_module.keyboard.press_key(key)
-            logger.info(f"Manual flask use: {slot}")
+        try:
+            flask_config = self.config.get('flask', {})
+            if isinstance(flask_config, dict):
+                slot_config = flask_config.get(slot, {})
+                if isinstance(slot_config, dict):
+                    key = slot_config.get('key')
+                    if key:
+                        self.flask_module.keyboard.press_key(key)
+                        logger.info(f"Manual flask use: {slot}")
+                    else:
+                        logger.warning(f"No key configured for flask slot: {slot}")
+                else:
+                    logger.warning(f"Invalid configuration for flask slot: {slot}")
+            else:
+                logger.warning("Invalid flask configuration")
+        except Exception as e:
+            logger.error(f"Error in manual flask use: {e}")
     
     def manual_skill_use(self, skill_name: str):
         """手動でスキルを使用"""

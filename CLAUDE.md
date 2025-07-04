@@ -204,6 +204,32 @@ python test_integration.py
 python test_comprehensive.py
 ```
 
+### 2025-07-04 MacroController・TinctureModuleエラー修正
+
+- [x] **MacroController.get_status()メソッド修正**
+  - [x] 存在しない`detection_active`属性参照エラーの修正
+  - [x] シンプルな`current_state`表示に変更（RUNNING/STOPPED）
+  - [x] TinctureModule統計情報の安全な取得
+  - [x] エラーハンドリングの強化
+  - [x] フォールバック処理による安全性向上
+
+- [x] **MacroController設定取得の安全性向上**
+  - [x] startメソッドでの設定型チェック追加（isinstance(config, dict)）
+  - [x] update_configメソッドでの設定型チェック追加
+  - [x] manual_flask_useメソッドでの設定型チェック追加
+  - [x] 'bool' object has no attribute 'get'エラーの解決
+  - [x] None値やbool値設定への対応
+
+- [x] **エラーハンドリングの改善**
+  - [x] isinstance()による型チェック追加
+  - [x] try-catch文によるエラー捕捉
+  - [x] 適切なログメッセージとフォールバック処理
+  - [x] 設定エラー時の安全な継続動作
+
+- [x] **テストスクリプト作成**
+  - [x] test_macro_controller_fix.py - エラー修正検証
+  - [x] 構文チェックによる修正確認（全ファイル合格）
+
 ### 2025-07-04 オーバーレイウィンドウ機能実装完了
 
 - [x] **オーバーレイウィンドウクラス実装 (src/features/overlay_window.py)**

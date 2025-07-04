@@ -1,68 +1,70 @@
-# POE Macro v3.0 - Detection Areas Configuration
-# フラスコ検出エリア設定ファイル
-
-# フラスコエリアの座標設定
 flask_area:
-  x: 245
-  y: 850
-  width: 400
-  height: 120
-  monitor: 0  # モニターインデックス（0 = プライマリモニター）
+  height: 131
+  monitor: 0
+  width: 327
+  x: 969
+  y: 1305
+metadata:
+  created_date: '2025-07-04'
+  description: POE Macro v3.0 Flask Detection Areas Configuration
+  last_modified: '2025-07-04'
+  notes: 'このファイルは POE Macro v3.0 の検出エリア設定を管理します。
 
-# Tinctureスロットの設定（フラスコエリア内での相対位置）
-tincture_slot:
-  relative_x: 180  # フラスコエリア内での相対X座標
-  relative_y: 0    # フラスコエリア内での相対Y座標
-  width: 60        # 検出エリア幅
-  height: 100      # 検出エリア高さ
 
-# 解像度別プリセット設定
+    設定項目の説明:
+
+    - flask_area: フラスコバー全体の検出エリア
+
+    - tincture_slot: Tinctureスロット（通常は3番）の相対位置
+
+    - presets: 解像度別の推奨設定
+
+
+    座標系について:
+
+    - 座標は画面の左上を原点(0,0)とする絶対座標
+
+    - マルチモニター環境では monitor インデックスで対象モニターを指定
+
+    - tincture_slot の座標は flask_area 内での相対座標
+
+
+    カスタマイズ方法:
+
+    1. オーバーレイウィンドウを使用した視覚的調整（推奨）
+
+    2. このファイルを直接編集（上級者向け）
+
+
+    注意事項:
+
+    - ゲームの UI スケールが変更された場合は再調整が必要
+
+    - ゲームアップデートでUIが変更された場合は再設定が必要
+
+    - 座標が画面外に設定された場合は自動的にデフォルト値に戻される'
+  version: '3.0'
 presets:
   1920x1080:
+    description: Full HD (1920x1080) standard preset
+    height: 120
+    width: 400
     x: 245
     y: 850
-    width: 400
-    height: 120
-    description: "Full HD (1920x1080) standard preset"
-    
   2560x1440:
+    description: 2K (2560x1440) standard preset
+    height: 160
+    width: 533
     x: 327
     y: 1133
-    width: 533
-    height: 160
-    description: "2K (2560x1440) standard preset"
-    
   3840x2160:
+    description: 4K (3840x2160) standard preset
+    height: 240
+    width: 800
     x: 490
     y: 1700
-    width: 800
-    height: 240
-    description: "4K (3840x2160) standard preset"
-
-# 設定メタデータ
-metadata:
-  version: "3.0"
-  created_date: "2025-07-04"
-  last_modified: "2025-07-04"
-  description: "POE Macro v3.0 Flask Detection Areas Configuration"
-  notes: |
-    このファイルは POE Macro v3.0 の検出エリア設定を管理します。
-    
-    設定項目の説明:
-    - flask_area: フラスコバー全体の検出エリア
-    - tincture_slot: Tinctureスロット（通常は3番）の相対位置
-    - presets: 解像度別の推奨設定
-    
-    座標系について:
-    - 座標は画面の左上を原点(0,0)とする絶対座標
-    - マルチモニター環境では monitor インデックスで対象モニターを指定
-    - tincture_slot の座標は flask_area 内での相対座標
-    
-    カスタマイズ方法:
-    1. オーバーレイウィンドウを使用した視覚的調整（推奨）
-    2. このファイルを直接編集（上級者向け）
-    
-    注意事項:
-    - ゲームの UI スケールが変更された場合は再調整が必要
-    - ゲームアップデートでUIが変更された場合は再設定が必要
-    - 座標が画面外に設定された場合は自動的にデフォルト値に戻される
+tincture_slot:
+  height: 100
+  relative_x: 180
+  relative_y: 0
+  width: 60
