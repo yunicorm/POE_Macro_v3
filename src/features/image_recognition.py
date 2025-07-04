@@ -38,7 +38,7 @@ class TinctureDetector:
         
         # 検出モードの設定
         tincture_config = self.config.get('tincture', {})
-        self.detection_mode = tincture_config.get('detection_mode', 'auto_slot3')
+        self.detection_mode = tincture_config.get('detection_mode', 'full_flask_area')
         
         # 手動検出エリアの設定
         self.manual_detection_area = None
@@ -98,8 +98,23 @@ class TinctureDetector:
                 capture_area = self.manual_detection_area.copy()
                 logger.debug(f"Using manual detection area: {capture_area}")
                 logger.debug(f"Manual area details - X:{capture_area['left']}, Y:{capture_area['top']}, W:{capture_area['width']}, H:{capture_area['height']}")
+            elif self.detection_mode == 'full_flask_area' and self.area_selector:
+                # フラスコエリア全体を使用（新しいモード）
+                try:
+                    full_area = self.area_selector.get_full_flask_area_for_tincture()
+                    capture_area = {
+                        'top': full_area['y'],
+                        'left': full_area['x'],
+                        'width': full_area['width'],
+                        'height': full_area['height']
+                    }
+                    logger.debug(f"Using full flask area for tincture detection: {capture_area}")
+                    logger.debug(f"Full flask area details - X:{full_area['x']}, Y:{full_area['y']}, W:{full_area['width']}, H:{full_area['height']}")
+                except Exception as e:
+                    logger.warning(f"Failed to get full flask area, using fallback: {e}")
+                    capture_area = self._get_fallback_area()
             elif self.area_selector:
-                # AreaSelectorから検出エリアを取得（従来の方法）
+                # AreaSelectorから検出エリアを取得（従来の3番スロット方法）
                 try:
                     tincture_area = self.area_selector.get_absolute_tincture_area()
                     capture_area = {
@@ -108,8 +123,8 @@ class TinctureDetector:
                         'width': tincture_area['width'],
                         'height': tincture_area['height']
                     }
-                    logger.debug(f"Using AreaSelector tincture detection area: {capture_area}")
-                    logger.debug(f"AreaSelector area details - X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
+                    logger.debug(f"Using AreaSelector 3rd slot detection area: {capture_area}")
+                    logger.debug(f"3rd slot area details - X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
                 except Exception as e:
                     logger.warning(f"Failed to get configured area, using fallback: {e}")
                     capture_area = self._get_fallback_area()
@@ -282,13 +297,13 @@ class TinctureDetector:
     def set_detection_mode(self, mode: str, area_dict: dict = None):
         """検出モードを設定"""
         try:
-            if mode in ['manual', 'auto_slot3']:
+            if mode in ['manual', 'auto_slot3', 'full_flask_area']:
                 self.detection_mode = mode
                 if mode == 'manual' and area_dict:
                     self.update_manual_detection_area(area_dict)
                 logger.info(f"Detection mode set to: {mode}")
             else:
-                raise ValueError(f"Invalid detection mode: {mode}")
+                raise ValueError(f"Invalid detection mode: {mode}. Supported modes: manual, auto_slot3, full_flask_area")
         except Exception as e:
             logger.error(f"Failed to set detection mode: {e}")
             raise

@@ -480,23 +480,19 @@ class MainWindow(QMainWindow):
             if 'tincture' not in self.config:
                 self.config['tincture'] = {}
             
-            # 手動検出モードに設定
-            self.config['tincture']['detection_mode'] = 'manual'
+            # フラスコエリア全体検出モードに設定
+            self.config['tincture']['detection_mode'] = 'full_flask_area'
             self.config['tincture']['detection_area'] = new_area
             self.config_manager.save_config(self.config)
             
             # MacroControllerのTinctureモジュールに変更を伝播
             if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
                 if self.macro_controller.tincture_module:
-                    # TinctureDetectorの手動検出エリアを更新
+                    # TinctureDetectorのフラスコエリア全体検出モードに切り替え
                     detector = self.macro_controller.tincture_module.detector
                     if detector and hasattr(detector, 'set_detection_mode'):
-                        detector.set_detection_mode('manual', new_area)
-                        self.log_message("手動検出モードに設定して検出エリアを更新しました")
-                    elif detector and hasattr(detector, 'update_manual_detection_area'):
-                        detector.detection_mode = 'manual'
-                        detector.update_manual_detection_area(new_area)
-                        self.log_message("手動検出エリアを更新しました")
+                        detector.set_detection_mode('full_flask_area')
+                        self.log_message("フラスコエリア全体検出モードに設定しました")
                     else:
                         # フォールバック: AreaSelectorを更新
                         if hasattr(self.macro_controller.tincture_module, 'update_detection_area'):
@@ -520,11 +516,17 @@ class MainWindow(QMainWindow):
             # 検出モードに応じて適切なエリアを表示
             detection_mode = self.config.get('tincture', {}).get('detection_mode', 'auto_slot3')
             if detection_mode == 'manual':
-                # 手動モード：フラスコエリア全体
+                # 手動モード：手動設定エリア
                 manual_area = self.area_selector.get_full_flask_area_for_tincture()
-                self.test_result_label.setText(f"テスト結果: 手動検出モード - フラスコエリア全体")
+                self.test_result_label.setText(f"テスト結果: 手動検出モード - 手動設定エリア")
                 self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
-                self.log_message(f"手動Tincture検出エリア（フラスコ全体）: ({manual_area['x']}, {manual_area['y']}, {manual_area['width']}, {manual_area['height']})")
+                self.log_message(f"手動Tincture検出エリア: ({manual_area['x']}, {manual_area['y']}, {manual_area['width']}, {manual_area['height']})")
+            elif detection_mode == 'full_flask_area':
+                # フラスコエリア全体モード
+                full_area = self.area_selector.get_full_flask_area_for_tincture()
+                self.test_result_label.setText(f"テスト結果: フラスコエリア全体検出モード")
+                self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
+                self.log_message(f"フラスコ全体Tincture検出エリア: ({full_area['x']}, {full_area['y']}, {full_area['width']}, {full_area['height']})")
             else:
                 # 自動モード：3番スロットのみ
                 tincture_area = self.area_selector.get_absolute_tincture_area()

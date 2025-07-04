@@ -77,7 +77,7 @@ tincture:
   sensitivity: 0.7
   check_interval: 0.1  # seconds
   min_use_interval: 0.5  # seconds
-  detection_mode: "manual"  # "manual" or "auto_slot3"
+  detection_mode: "full_flask_area"  # "manual", "auto_slot3", or "full_flask_area"
   # 手動設定エリア（フラスコエリア全体）
   detection_area:
     x: 1680    # 検出エリアのX座標

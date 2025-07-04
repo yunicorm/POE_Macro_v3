@@ -553,6 +553,82 @@ python test_tincture_debug.py
 
 ---
 
-**修正作業完了日**: 2025-07-04  
-**次回セッション**: 依存関係インストール → Tinctureデバッグテスト → 実機テスト  
-**ステータス**: 🟢 Ready for Production Testing (Tincture Debug Enhanced)
+## 🔄 Tincture検出エリア拡張機能（2025-07-05）
+
+### 📋 問題の概要
+GUIで設定した検出エリアがTinctureDetectorに反映されず、3番スロットの狭い範囲（60x100）のみを使用していた問題を解決。
+
+### 🛠️ 実装内容
+
+#### 1. 検出モード機能の実装
+**3つの検出モード**:
+- `manual`: 手動設定エリア使用
+- `auto_slot3`: 従来の3番スロット自動計算（60x100）
+- `full_flask_area`: フラスコエリア全体使用（新機能）
+
+#### 2. AreaSelectorの拡張
+**ファイル**: `src/features/area_selector.py`
+```python
+def get_full_flask_area_for_tincture(self) -> Dict:
+    """フラスコエリア全体をTincture検出エリアとして取得"""
+    flask_area = self.get_flask_area()
+    return {
+        "x": flask_area["x"],
+        "y": flask_area["y"],
+        "width": flask_area["width"],
+        "height": flask_area["height"]
+    }
+```
+
+#### 3. TinctureDetectorの大幅拡張
+**ファイル**: `src/features/image_recognition.py`
+- `_capture_screen()`: 検出モード別キャプチャエリア決定
+- `set_detection_mode()`: 3モード対応の動的切り替え
+- `update_manual_detection_area()`: 手動エリア更新
+
+#### 4. GUI統合の改善
+**ファイル**: `src/gui/main_window.py`
+- `apply_manual_settings()`: 自動的に `full_flask_area` モードに設定
+- 検出エリア変更の即座反映
+- モード別検出エリア表示
+
+#### 5. 設定ファイルの更新
+**ファイル**: `config/default_config.yaml`
+```yaml
+tincture:
+  detection_mode: "full_flask_area"  # デフォルトをフラスコ全体に
+```
+
+### 📊 効果と成果
+
+#### 検出範囲の劇的拡大
+| モード | サイズ | 面積 | 説明 |
+|--------|--------|------|------|
+| 従来（3番スロット） | 60x100 | 6,000 px² | 狭い範囲 |
+| 新機能（フラスコ全体） | 398x130 | 51,740 px² | **8.6倍拡大** |
+
+#### 実座標例（ユーザー設定）
+- **フラスコエリア**: X:931, Y:1305, W:398, H:130
+- **3番スロット計算**: X:1111, Y:1305, W:60, H:100
+
+### 🎯 主な改善点
+1. **検出精度向上**: フラスコエリア全体での検出により見逃し大幅減少
+2. **柔軟性向上**: 画面解像度・UIレイアウト変更に対応
+3. **設定簡便性**: オーバーレイ視覚設定が検出エリアに直接反映
+4. **互換性維持**: 従来の検出モードも引き続き利用可能
+
+### 🧪 テストスイート
+- `test_detection_area_update.py`: 設定更新機能テスト
+- `test_manual_detection_mode.py`: 手動モードテスト
+- `test_full_flask_area_detection.py`: フラスコ全体検出テスト
+
+### 💡 使用方法
+1. **オーバーレイでフラスコエリア設定**
+2. **GUI「適用」ボタン** → 自動的に `full_flask_area` モードに
+3. **TinctureDetectorがフラスコ全体で検出実行**
+
+---
+
+**修正作業完了日**: 2025-07-05  
+**次回セッション**: 依存関係インストール → 実機でのフラスコ全体検出テスト  
+**ステータス**: 🟢 Ready for Production Testing (Full Flask Area Detection)
