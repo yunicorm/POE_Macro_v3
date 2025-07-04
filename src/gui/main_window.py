@@ -24,6 +24,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("POE Macro v3.0")
         self.setGeometry(100, 100, 800, 600)
         
+        # ログテキスト要素を早期初期化（安全性のため）
+        self.log_text = None
+        
         # UI要素の初期化
         self.init_ui()
         
@@ -45,13 +48,13 @@ class MainWindow(QMainWindow):
         self.tab_widget = QTabWidget()
         layout.addWidget(self.tab_widget)
         
-        # 各タブを作成
+        # 各タブを作成（ログタブを先に作成してlog_textを初期化）
+        self.create_log_tab()
         self.create_general_tab()
         self.create_tincture_tab()
         self.create_flask_tab()
         self.create_skills_tab()
         self.create_calibration_tab()
-        self.create_log_tab()
         
         # ステータスバー
         self.statusBar().showMessage("Ready")
@@ -746,16 +749,26 @@ class MainWindow(QMainWindow):
             logger.error(f"Status update error: {e}")
     
     def log_message(self, message):
-        """ログメッセージを表示"""
+        """ログメッセージを表示（安全性チェック付き）"""
         import datetime
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         formatted_message = f"[{timestamp}] {message}"
-        self.log_text.append(formatted_message)
+        
+        # log_textが初期化されているかチェック
+        if hasattr(self, 'log_text') and self.log_text is not None:
+            self.log_text.append(formatted_message)
+        else:
+            # log_textがまだ初期化されていない場合は、標準ログにのみ出力
+            logger.warning(f"log_text not initialized yet: {formatted_message}")
+        
         logger.info(message)
     
     def clear_log(self):
-        """ログをクリア"""
-        self.log_text.clear()
+        """ログをクリア（安全性チェック付き）"""
+        if hasattr(self, 'log_text') and self.log_text is not None:
+            self.log_text.clear()
+        else:
+            logger.warning("log_text not initialized, cannot clear log")
     
     def closeEvent(self, event):
         """ウィンドウが閉じられる時の処理"""
