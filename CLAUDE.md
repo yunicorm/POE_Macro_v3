@@ -487,3 +487,56 @@ python test_comprehensive.py
 - [x] **マルチスレッド安定性**: TinctureModuleの正常動作確保
 - [x] **フォールバック処理**: エラー時も継続動作可能
 - [x] **デバッグ容易性**: 詳細ログによる問題特定迅速化
+
+## 2025-07-04 Tincture機能デバッグ強化
+
+### Tincture動作問題の包括的調査・修正
+- [x] **設定確認と検証**
+  - [x] config/default_config.yaml のtincture設定確認（enabled: true, key: "3", sensitivity: 0.7）
+  - [x] テンプレート画像の存在確認（assets/images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png）
+  - [x] MacroControllerでのTinctureModule初期化・起動確認
+
+- [x] **詳細デバッグログ機能追加**
+  - [x] src/modules/tincture_module.py:_tincture_loop() - 検出・使用の詳細ログ
+    - [x] 検出間隔とタイミングの詳細ログ
+    - [x] Idle状態検出結果の詳細表示
+    - [x] 最小使用間隔チェックのログ
+    - [x] Tincture使用実行とキー入力のログ
+    - [x] 統計情報更新の詳細表示
+    - [x] エラー発生時の完全なトレースバック
+  
+  - [x] src/features/image_recognition.py:detect_tincture_icon() - 画像認識の詳細ログ
+    - [x] テンプレート読み込み状況の確認
+    - [x] 画面キャプチャの詳細情報（サイズ・形状）
+    - [x] テンプレートマッチング結果の詳細表示（min/max値、位置）
+    - [x] 検出判定の詳細ログ（信頼度vs感度）
+    - [x] 検出失敗時の完全なエラー情報
+
+- [x] **包括的テストスクリプト作成**
+  - [x] test_tincture_debug.py - Tincture機能専用デバッグツール
+    - [x] 設定読み込み状況の詳細確認
+    - [x] テンプレート画像の存在・読み込み確認
+    - [x] 検出エリア設定状況の確認
+    - [x] 単発検出テスト機能
+    - [x] 10秒間の動作テストと統計情報収集
+    - [x] リアルタイムステータス表示
+    - [x] 最終結果分析と動作判定
+
+- [x] **ログレベル最適化**
+  - [x] main.py - DEBUGレベルでTincture動作状況を詳細確認
+  - [x] Tincture検出ログの可視性向上
+
+### デバッグ機能の特徴
+- **リアルタイム監視**: 検出処理の実行状況を逐次確認
+- **統計情報**: 成功/失敗検出数、使用回数の詳細追跡
+- **エラー追跡**: 例外発生時の完全なスタックトレース
+- **設定検証**: テンプレート画像、検出エリア、感度設定の確認
+- **動作判定**: 10秒間テストによる機能正常性の自動判定
+
+### 実行方法
+```bash
+# Tincture機能の詳細デバッグテスト
+python test_tincture_debug.py
+```
+
+このデバッグ強化により、Tincture機能の動作状況を詳細に把握し、問題の特定と解決を迅速に行うことが可能になりました。
