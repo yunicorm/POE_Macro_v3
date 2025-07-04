@@ -19,9 +19,8 @@ class LogMonitor:
         self.config = config
         self.macro_controller = macro_controller
         
-        # ログファイルパス
-        self.log_file_path = Path(config.get('log_path', 
-            r'C:\Program Files (x86)\Steam\steamapps\common\Path of Exile\logs\Client.txt'))
+        # ログファイルパス（Steam版優先で自動検出）
+        self.log_file_path = Path(config.get('log_path', self._find_client_log_path()))
         
         # 監視設定
         self.check_interval = config.get('check_interval', 0.5)  # 0.5秒間隔
@@ -66,6 +65,25 @@ class LogMonitor:
         # コールバック
         self.on_area_enter = None
         self.on_area_exit = None
+        
+    def _find_client_log_path(self) -> str:
+        """POE Client.txtファイルのパスを自動検出"""
+        # 検索対象のパス（Steam版優先）
+        potential_paths = [
+            r'C:\Program Files (x86)\Steam\steamapps\common\Path of Exile\logs\Client.txt',
+            r'C:\Program Files\Steam\steamapps\common\Path of Exile\logs\Client.txt',
+            r'C:\Program Files (x86)\Grinding Gear Games\Path of Exile\logs\Client.txt',
+            r'C:\Program Files\Grinding Gear Games\Path of Exile\logs\Client.txt'
+        ]
+        
+        for path in potential_paths:
+            if Path(path).exists():
+                logger.info(f"Found POE Client.txt at: {path}")
+                return path
+                
+        # どれも見つからない場合はSteam版のデフォルトを返す
+        logger.warning("POE Client.txt not found, using default Steam path")
+        return potential_paths[0]
         
     def start(self):
         """ログ監視を開始"""
