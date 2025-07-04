@@ -15,6 +15,11 @@ class FlaskModule:
     """フラスコ自動使用を制御するクラス"""
     
     def __init__(self, config: Dict[str, Any]):
+        # 設定の型チェック
+        if not isinstance(config, dict):
+            logger.error(f"FlaskModule.__init__ received non-dict config: {type(config)} - {config}")
+            config = {'enabled': False}  # フォールバック設定
+        
         self.config = config
         self.keyboard = KeyboardController()
         self.running = False

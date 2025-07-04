@@ -25,6 +25,11 @@ class TinctureModule:
         Args:
             config: 設定辞書
         """
+        # 設定の型チェック
+        if not isinstance(config, dict):
+            logger.error(f"TinctureModule.__init__ received non-dict config: {type(config)} - {config}")
+            config = {'enabled': False}  # フォールバック設定
+        
         self.config = config
         self.running = False
         self.thread: Optional[threading.Thread] = None
@@ -144,6 +149,11 @@ class TinctureModule:
     def update_config(self, new_config: Dict[str, Any]) -> None:
         """設定を更新"""
         try:
+            # 設定の型チェック
+            if not isinstance(new_config, dict):
+                logger.error(f"TinctureModule.update_config received non-dict config: {type(new_config)} - {new_config}")
+                return
+            
             # 設定の更新
             old_enabled = self.enabled
             self.config = new_config

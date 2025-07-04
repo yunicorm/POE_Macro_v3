@@ -28,17 +28,39 @@ class ConfigManager:
             logger.debug(f"Config type after loading: {type(self.config)}")
             if isinstance(self.config, dict):
                 logger.debug(f"Config keys: {list(self.config.keys())}")
-                logger.debug(f"Flask config type: {type(self.config.get('flask'))}")
-                logger.debug(f"Skills config type: {type(self.config.get('skills'))}")
-                logger.debug(f"Tincture config type: {type(self.config.get('tincture'))}")
+                
+                # Flask設定の詳細デバッグ
+                flask_config = self.config.get('flask')
+                logger.debug(f"Flask config type: {type(flask_config)}")
+                logger.debug(f"Flask config value: {flask_config}")
+                if isinstance(flask_config, dict):
+                    logger.debug(f"Flask config keys: {list(flask_config.keys())}")
+                
+                # Skills設定の詳細デバッグ
+                skills_config = self.config.get('skills')
+                logger.debug(f"Skills config type: {type(skills_config)}")
+                logger.debug(f"Skills config value: {skills_config}")
+                if isinstance(skills_config, dict):
+                    logger.debug(f"Skills config keys: {list(skills_config.keys())}")
+                
+                # Tincture設定の詳細デバッグ
+                tincture_config = self.config.get('tincture')
+                logger.debug(f"Tincture config type: {type(tincture_config)}")
+                logger.debug(f"Tincture config value: {tincture_config}")
+                if isinstance(tincture_config, dict):
+                    logger.debug(f"Tincture config keys: {list(tincture_config.keys())}")
             else:
                 logger.error(f"Config is not a dictionary: {self.config}")
             
             # ユーザー設定があれば上書き
             if self.user_config_path.exists():
+                logger.debug(f"User config file exists: {self.user_config_path}")
                 with open(self.user_config_path, 'r', encoding='utf-8') as f:
                     user_config = yaml.safe_load(f)
+                    logger.debug(f"User config type: {type(user_config)}")
+                    logger.debug(f"User config value: {user_config}")
                     if isinstance(user_config, dict):
+                        logger.debug(f"Merging user config...")
                         self._merge_config(self.config, user_config)
                         logger.info(f"Loaded user config from {self.user_config_path}")
                     else:

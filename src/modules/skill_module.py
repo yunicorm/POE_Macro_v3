@@ -15,6 +15,11 @@ class SkillModule:
     """スキル自動使用を制御するクラス"""
     
     def __init__(self, config: Dict[str, Any]):
+        # 設定の型チェック
+        if not isinstance(config, dict):
+            logger.error(f"SkillModule.__init__ received non-dict config: {type(config)} - {config}")
+            config = {'enabled': False}  # フォールバック設定
+        
         self.config = config
         self.keyboard = KeyboardController()
         self.running = False
@@ -55,6 +60,11 @@ class SkillModule:
     
     def update_config(self, config: Dict[str, Any]):
         """設定の更新"""
+        # 設定の型チェック
+        if not isinstance(config, dict):
+            logger.error(f"SkillModule.update_config received non-dict config: {type(config)} - {config}")
+            return
+        
         self.config = config
         logger.info("Skill module configuration updated")
     

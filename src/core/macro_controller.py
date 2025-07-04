@@ -51,9 +51,36 @@ class MacroController:
             tincture_config = {'enabled': False}
         logger.debug(f"Tincture config for init: {tincture_config}")
         
-        self.flask_module = FlaskModule(flask_config)
-        self.skill_module = SkillModule(skills_config)
-        self.tincture_module = TinctureModule(tincture_config)
+        # モジュールの初期化（エラー処理付き）
+        try:
+            logger.debug("Initializing FlaskModule...")
+            self.flask_module = FlaskModule(flask_config)
+            logger.debug("FlaskModule initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize FlaskModule: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            raise
+        
+        try:
+            logger.debug("Initializing SkillModule...")
+            self.skill_module = SkillModule(skills_config)
+            logger.debug("SkillModule initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize SkillModule: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            raise
+        
+        try:
+            logger.debug("Initializing TinctureModule...")
+            self.tincture_module = TinctureModule(tincture_config)
+            logger.debug("TinctureModule initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize TinctureModule: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            raise
         
         # 制御状態
         self.running = False
@@ -143,7 +170,10 @@ class MacroController:
             logger.info("MacroController started successfully")
             
         except Exception as e:
+            import traceback
             logger.error(f"Failed to start MacroController: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
             self.stop()
             raise
     
