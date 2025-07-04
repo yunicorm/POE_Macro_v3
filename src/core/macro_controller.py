@@ -20,10 +20,40 @@ class MacroController:
         self.config_manager = config_manager
         self.config = config_manager.load_config()
         
-        # モジュールの初期化
-        self.flask_module = FlaskModule(self.config.get('flask', {}))
-        self.skill_module = SkillModule(self.config.get('skills', {}))
-        self.tincture_module = TinctureModule(self.config.get('tincture', {}))
+        # configが正しく読み込まれていることを確認
+        logger.debug(f"MacroController init - config type: {type(self.config)}")
+        if not isinstance(self.config, dict):
+            logger.error(f"Invalid config type: {type(self.config)}, using fallback")
+            self.config = {
+                'flask': {'enabled': False},
+                'skills': {'enabled': False},
+                'tincture': {'enabled': False}
+            }
+        
+        logger.debug(f"Config keys available: {list(self.config.keys())}")
+        
+        # モジュールの初期化（各設定を安全に取得）
+        flask_config = self.config.get('flask', {})
+        if not isinstance(flask_config, dict):
+            logger.warning(f"Flask config is not dict: {type(flask_config)}, using fallback")
+            flask_config = {'enabled': False}
+        logger.debug(f"Flask config for init: {flask_config}")
+        
+        skills_config = self.config.get('skills', {})
+        if not isinstance(skills_config, dict):
+            logger.warning(f"Skills config is not dict: {type(skills_config)}, using fallback")
+            skills_config = {'enabled': False}
+        logger.debug(f"Skills config for init: {skills_config}")
+        
+        tincture_config = self.config.get('tincture', {})
+        if not isinstance(tincture_config, dict):
+            logger.warning(f"Tincture config is not dict: {type(tincture_config)}, using fallback")
+            tincture_config = {'enabled': False}
+        logger.debug(f"Tincture config for init: {tincture_config}")
+        
+        self.flask_module = FlaskModule(flask_config)
+        self.skill_module = SkillModule(skills_config)
+        self.tincture_module = TinctureModule(tincture_config)
         
         # 制御状態
         self.running = False
@@ -32,6 +62,8 @@ class MacroController:
         # グローバルホットキーリスナー
         self.hotkey_listener = None
         
+        logger.info("MacroController initialized successfully")
+        
     def start(self):
         """全マクロモジュールを開始"""
         if self.running:
@@ -39,6 +71,13 @@ class MacroController:
             return
             
         try:
+            # デバッグ: config構造を確認
+            logger.debug(f"Start - Config type: {type(self.config)}")
+            logger.debug(f"Start - Config keys: {self.config.keys() if isinstance(self.config, dict) else 'Not a dict'}")
+            logger.debug(f"Start - Flask config: {self.config.get('flask', 'NOT FOUND') if isinstance(self.config, dict) else 'Config not dict'}")
+            logger.debug(f"Start - Skills config: {self.config.get('skills', 'NOT FOUND') if isinstance(self.config, dict) else 'Config not dict'}")
+            logger.debug(f"Start - Tincture config: {self.config.get('tincture', 'NOT FOUND') if isinstance(self.config, dict) else 'Config not dict'}")
+            
             self.running = True
             self.emergency_stop = False
             
@@ -46,22 +85,31 @@ class MacroController:
             logger.info("Starting macro modules...")
             
             # flask設定の安全な取得
-            flask_config = self.config.get('flask', {})
+            flask_config = self.config.get('flask', {}) if isinstance(self.config, dict) else {}
+            logger.debug(f"Retrieved flask_config: {flask_config} (type: {type(flask_config)})")
             if isinstance(flask_config, dict) and flask_config.get('enabled', False):
                 self.flask_module.start()
                 logger.info("Flask module started")
+            else:
+                logger.info(f"Flask module not started - enabled: {flask_config.get('enabled', False) if isinstance(flask_config, dict) else 'config not dict'}")
             
             # skills設定の安全な取得
-            skills_config = self.config.get('skills', {})
+            skills_config = self.config.get('skills', {}) if isinstance(self.config, dict) else {}
+            logger.debug(f"Retrieved skills_config: {skills_config} (type: {type(skills_config)})")
             if isinstance(skills_config, dict) and skills_config.get('enabled', False):
                 self.skill_module.start()
                 logger.info("Skill module started")
+            else:
+                logger.info(f"Skill module not started - enabled: {skills_config.get('enabled', False) if isinstance(skills_config, dict) else 'config not dict'}")
             
             # tincture設定の安全な取得
-            tincture_config = self.config.get('tincture', {})
+            tincture_config = self.config.get('tincture', {}) if isinstance(self.config, dict) else {}
+            logger.debug(f"Retrieved tincture_config: {tincture_config} (type: {type(tincture_config)})")
             if isinstance(tincture_config, dict) and tincture_config.get('enabled', False):
                 self.tincture_module.start()
                 logger.info("Tincture module started")
+            else:
+                logger.info(f"Tincture module not started - enabled: {tincture_config.get('enabled', False) if isinstance(tincture_config, dict) else 'config not dict'}")
             
             # 緊急停止ホットキーの設定
             self._setup_emergency_stop()
@@ -196,22 +244,37 @@ class MacroController:
     def manual_flask_use(self, slot: str):
         """手動でフラスコを使用"""
         try:
+            logger.debug(f"Manual flask use requested for slot: {slot}")
+            logger.debug(f"Config type: {type(self.config)}")
+            
+            if not isinstance(self.config, dict):
+                logger.warning("Configuration is not valid for manual flask use")
+                return
+                
             flask_config = self.config.get('flask', {})
-            if isinstance(flask_config, dict):
-                slot_config = flask_config.get(slot, {})
-                if isinstance(slot_config, dict):
-                    key = slot_config.get('key')
-                    if key:
-                        self.flask_module.keyboard.press_key(key)
-                        logger.info(f"Manual flask use: {slot}")
-                    else:
-                        logger.warning(f"No key configured for flask slot: {slot}")
+            logger.debug(f"Flask config type: {type(flask_config)}")
+            
+            if not isinstance(flask_config, dict):
+                logger.warning(f"Flask configuration is not valid: {type(flask_config)}")
+                return
+                
+            slot_config = flask_config.get(slot, {})
+            logger.debug(f"Slot {slot} config: {slot_config}")
+            
+            if isinstance(slot_config, dict):
+                key = slot_config.get('key')
+                if key:
+                    self.flask_module.keyboard.press_key(key)
+                    logger.info(f"Manual flask use: {slot} -> {key}")
                 else:
-                    logger.warning(f"Invalid configuration for flask slot: {slot}")
+                    logger.warning(f"No key configured for flask slot: {slot}")
             else:
-                logger.warning("Invalid flask configuration")
+                logger.warning(f"Invalid configuration for flask slot: {slot} - {type(slot_config)}")
+                
         except Exception as e:
             logger.error(f"Error in manual flask use: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     def manual_skill_use(self, skill_name: str):
         """手動でスキルを使用"""

@@ -24,18 +24,43 @@ class ConfigManager:
                 self.config = yaml.safe_load(f)
             logger.info(f"Loaded default config from {self.config_path}")
             
+            # デバッグ: 読み込んだ設定の型と構造を確認
+            logger.debug(f"Config type after loading: {type(self.config)}")
+            if isinstance(self.config, dict):
+                logger.debug(f"Config keys: {list(self.config.keys())}")
+                logger.debug(f"Flask config type: {type(self.config.get('flask'))}")
+                logger.debug(f"Skills config type: {type(self.config.get('skills'))}")
+                logger.debug(f"Tincture config type: {type(self.config.get('tincture'))}")
+            else:
+                logger.error(f"Config is not a dictionary: {self.config}")
+            
             # ユーザー設定があれば上書き
             if self.user_config_path.exists():
                 with open(self.user_config_path, 'r', encoding='utf-8') as f:
                     user_config = yaml.safe_load(f)
-                    self._merge_config(self.config, user_config)
-                logger.info(f"Loaded user config from {self.user_config_path}")
-                
+                    if isinstance(user_config, dict):
+                        self._merge_config(self.config, user_config)
+                        logger.info(f"Loaded user config from {self.user_config_path}")
+                    else:
+                        logger.warning(f"User config is not a dictionary, skipping: {type(user_config)}")
+            
+            # 最終的な設定構造をデバッグ
+            logger.debug(f"Final config type: {type(self.config)}")
+            logger.debug(f"Returning config with keys: {list(self.config.keys()) if isinstance(self.config, dict) else 'Not a dict'}")
+            
             return self.config
             
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
-            raise
+            # フォールバック設定を返す
+            fallback_config = {
+                'flask': {'enabled': False},
+                'skills': {'enabled': False},
+                'tincture': {'enabled': False}
+            }
+            logger.warning(f"Using fallback config: {fallback_config}")
+            self.config = fallback_config
+            return self.config
     
     def save_user_config(self) -> None:
         """現在の設定をユーザー設定として保存"""

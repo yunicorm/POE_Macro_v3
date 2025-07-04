@@ -226,8 +226,21 @@ python test_comprehensive.py
   - [x] 適切なログメッセージとフォールバック処理
   - [x] 設定エラー時の安全な継続動作
 
+- [x] **包括的デバッグ機能追加**
+  - [x] ConfigManager.load_config()にデバッグログ追加
+  - [x] MacroController.__init__()にデバッグログ追加  
+  - [x] MacroController.start()にデバッグログ追加
+  - [x] manual_flask_use()にデバッグログ追加
+  - [x] 設定構造の完全な検証とログ出力
+
+- [x] **フォールバック機能強化**
+  - [x] ConfigManagerでの設定読み込み失敗時のフォールバック
+  - [x] MacroControllerでの無効設定検出時のフォールバック
+  - [x] 各モジュール設定の型チェックとフォールバック
+
 - [x] **テストスクリプト作成**
   - [x] test_macro_controller_fix.py - エラー修正検証
+  - [x] test_config_debug.py - 設定関連包括デバッグ
   - [x] 構文チェックによる修正確認（全ファイル合格）
 
 ### 2025-07-04 オーバーレイウィンドウ機能実装完了
