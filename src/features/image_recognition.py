@@ -143,23 +143,41 @@ class TinctureDetector:
     def detect_tincture_icon(self) -> bool:
         """Tincture Idle状態を検出"""
         try:
+            logger.debug("Starting Tincture detection...")
+            
+            # テンプレートの検証
+            if self.template is None:
+                logger.error("Template not loaded!")
+                return False
+            
+            logger.debug(f"Template shape: {self.template.shape}")
+            
             # 画面をキャプチャ
+            logger.debug("Capturing screen...")
             screen = self._capture_screen()
+            logger.debug(f"Screen captured, shape: {screen.shape}")
             
             # テンプレートマッチング
+            logger.debug(f"Running template matching with sensitivity: {self.sensitivity}")
             result = cv2.matchTemplate(screen, self.template, cv2.TM_CCOEFF_NORMED)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            
+            logger.debug(f"Template matching result: min={min_val:.3f}, max={max_val:.3f}, location={max_loc}")
             
             # 検出判定
             detected = max_val >= self.sensitivity
             
             if detected:
-                logger.debug(f"Tincture idle state detected (confidence: {max_val:.3f})")
+                logger.info(f"Tincture IDLE detected! (confidence: {max_val:.3f} >= {self.sensitivity})")
+            else:
+                logger.debug(f"Tincture NOT detected (confidence: {max_val:.3f} < {self.sensitivity})")
             
             return detected
             
         except Exception as e:
             logger.error(f"Detection failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False
     
     def get_detection_area_info(self) -> Dict[str, any]:

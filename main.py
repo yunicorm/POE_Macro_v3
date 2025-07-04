@@ -23,8 +23,8 @@ from utils.image_recognition import ImageRecognition
 
 def setup_logging(debug_mode=False):
     """ログ設定"""
-    # 一時的にDEBUGレベルに設定（bool型エラーのデバッグのため）
-    log_level = logging.DEBUG  # 一時的にDEBUGに固定
+    # Tincture動作確認のためDEBUGレベルに設定
+    log_level = logging.DEBUG  # Tincture検出のデバッグ情報を表示
     # log_level = logging.DEBUG if debug_mode else logging.INFO  # 通常はこちら
     
     # ログフォーマット

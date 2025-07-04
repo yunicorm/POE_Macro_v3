@@ -116,31 +116,52 @@ class TinctureModule:
     def _tincture_loop(self) -> None:
         """簡略化されたループ - Idle状態のみ検出"""
         logger.info("Tincture monitoring started")
+        logger.debug(f"Detection interval: {self.check_interval}s, Min use interval: {self.min_use_interval}s")
         
         while self.running:
             try:
+                logger.debug("Checking for Tincture Idle state...")
+                
                 # Idle状態を検出
-                if self.detector.detect_tincture_icon():
+                detected = self.detector.detect_tincture_icon()
+                logger.debug(f"Detection result: {detected}")
+                
+                if detected:
                     # 最小使用間隔をチェック
                     current_time = time.time()
-                    if current_time - self.last_use_time >= self.min_use_interval:
+                    time_since_last_use = current_time - self.last_use_time
+                    logger.debug(f"Time since last use: {time_since_last_use:.2f}s (min required: {self.min_use_interval}s)")
+                    
+                    if time_since_last_use >= self.min_use_interval:
                         # Tinctureを使用
-                        logger.info(f"Using tincture (key: {self.key})")
+                        logger.info(f"Tincture IDLE detected! Using tincture (key: {self.key})")
                         self.keyboard.press_key(self.key)
                         
                         # 統計を更新
                         self.last_use_time = current_time
                         self.stats['total_uses'] += 1
+                        self.stats['successful_detections'] += 1
                         self.stats['last_use_timestamp'] = current_time
                         
+                        logger.info(f"Tincture used successfully. Total uses: {self.stats['total_uses']}")
+                        
                         # 使用後は一定時間待機（アクティブ時間を考慮）
+                        logger.debug("Waiting 5 seconds for tincture to become active...")
                         time.sleep(5.0)  # Tinctureが有効になるまで待機
+                    else:
+                        logger.debug(f"Skipping use - minimum interval not met ({time_since_last_use:.2f}s < {self.min_use_interval}s)")
+                else:
+                    self.stats['failed_detections'] += 1
+                    logger.debug("No Tincture IDLE state detected")
                 
                 # 検出間隔
+                logger.debug(f"Sleeping for {self.check_interval}s before next check...")
                 time.sleep(self.check_interval)
                 
             except Exception as e:
                 logger.error(f"Error in tincture loop: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 time.sleep(self.check_interval * 2)
         
         logger.info("Tincture monitoring ended")
