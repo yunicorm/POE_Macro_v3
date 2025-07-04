@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self.create_tincture_tab()
         self.create_flask_tab()
         self.create_skills_tab()
+        self.create_calibration_tab()
         self.create_log_tab()
         
         # ステータスバー
@@ -236,6 +237,217 @@ class MainWindow(QMainWindow):
         layout.addWidget(log_group)
         
         self.tab_widget.addTab(widget, "ログ")
+    
+    def create_calibration_tab(self):
+        """キャリブレーションタブを作成"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # 検出エリア設定グループ
+        area_group = QGroupBox("検出エリア設定")
+        area_layout = QGridLayout(area_group)
+        
+        # 現在の設定表示
+        area_layout.addWidget(QLabel("現在の検出エリア:"), 0, 0)
+        self.current_area_label = QLabel("X: 245, Y: 850, W: 400, H: 120")
+        area_layout.addWidget(self.current_area_label, 0, 1, 1, 2)
+        
+        # プリセット選択
+        area_layout.addWidget(QLabel("プリセット:"), 1, 0)
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItems(["1920x1080", "2560x1440", "3840x2160", "カスタム"])
+        area_layout.addWidget(self.preset_combo, 1, 1)
+        
+        self.apply_preset_btn = QPushButton("プリセット適用")
+        self.apply_preset_btn.clicked.connect(self.apply_preset)
+        area_layout.addWidget(self.apply_preset_btn, 1, 2)
+        
+        # オーバーレイ表示ボタン
+        self.show_overlay_btn = QPushButton("検出エリア設定を開く")
+        self.show_overlay_btn.clicked.connect(self.show_overlay_window)
+        area_layout.addWidget(self.show_overlay_btn, 2, 0, 1, 3)
+        
+        layout.addWidget(area_group)
+        
+        # 検出テストグループ
+        test_group = QGroupBox("検出テスト")
+        test_layout = QGridLayout(test_group)
+        
+        self.test_detection_btn = QPushButton("現在のエリアで検出テスト")
+        self.test_detection_btn.clicked.connect(self.test_detection)
+        test_layout.addWidget(self.test_detection_btn, 0, 0)
+        
+        self.test_result_label = QLabel("テスト結果: 未実行")
+        test_layout.addWidget(self.test_result_label, 1, 0)
+        
+        layout.addWidget(test_group)
+        
+        # 詳細設定グループ
+        detail_group = QGroupBox("詳細設定")
+        detail_layout = QGridLayout(detail_group)
+        
+        detail_layout.addWidget(QLabel("X座標:"), 0, 0)
+        self.x_spinbox = QSpinBox()
+        self.x_spinbox.setRange(0, 3840)
+        self.x_spinbox.setValue(245)
+        detail_layout.addWidget(self.x_spinbox, 0, 1)
+        
+        detail_layout.addWidget(QLabel("Y座標:"), 0, 2)
+        self.y_spinbox = QSpinBox()
+        self.y_spinbox.setRange(0, 2160)
+        self.y_spinbox.setValue(850)
+        detail_layout.addWidget(self.y_spinbox, 0, 3)
+        
+        detail_layout.addWidget(QLabel("幅:"), 1, 0)
+        self.width_spinbox = QSpinBox()
+        self.width_spinbox.setRange(100, 800)
+        self.width_spinbox.setValue(400)
+        detail_layout.addWidget(self.width_spinbox, 1, 1)
+        
+        detail_layout.addWidget(QLabel("高さ:"), 1, 2)
+        self.height_spinbox = QSpinBox()
+        self.height_spinbox.setRange(50, 240)
+        self.height_spinbox.setValue(120)
+        detail_layout.addWidget(self.height_spinbox, 1, 3)
+        
+        self.apply_manual_btn = QPushButton("手動設定を適用")
+        self.apply_manual_btn.clicked.connect(self.apply_manual_settings)
+        detail_layout.addWidget(self.apply_manual_btn, 2, 0, 1, 4)
+        
+        layout.addWidget(detail_group)
+        
+        layout.addStretch()
+        
+        self.tab_widget.addTab(widget, "キャリブレーション")
+        
+        # オーバーレイウィンドウの初期化
+        self.overlay_window = None
+        self.area_selector = None
+        
+    def show_overlay_window(self):
+        """オーバーレイウィンドウを表示"""
+        try:
+            if self.overlay_window is None:
+                from src.features.overlay_window import OverlayWindow
+                from src.features.area_selector import AreaSelector
+                
+                # AreaSelectorを初期化
+                self.area_selector = AreaSelector()
+                current_area = self.area_selector.get_flask_area()
+                
+                # オーバーレイウィンドウを作成
+                self.overlay_window = OverlayWindow(
+                    current_area.get('x', 245),
+                    current_area.get('y', 850),
+                    current_area.get('width', 400),
+                    current_area.get('height', 120)
+                )
+                
+                # シグナル接続
+                self.overlay_window.area_changed.connect(self.on_area_changed)
+                self.overlay_window.settings_saved.connect(self.on_settings_saved)
+                self.overlay_window.overlay_closed.connect(self.on_overlay_closed)
+            
+            self.overlay_window.show_overlay()
+            self.log_message("オーバーレイウィンドウを表示しました")
+            
+        except Exception as e:
+            self.log_message(f"オーバーレイウィンドウの表示エラー: {e}")
+    
+    def on_area_changed(self, x, y, width, height):
+        """オーバーレイのエリアが変更された時の処理"""
+        self.current_area_label.setText(f"X: {x}, Y: {y}, W: {width}, H: {height}")
+        self.x_spinbox.setValue(x)
+        self.y_spinbox.setValue(y)
+        self.width_spinbox.setValue(width)
+        self.height_spinbox.setValue(height)
+        
+    def on_settings_saved(self):
+        """設定が保存された時の処理"""
+        try:
+            if self.overlay_window and self.area_selector:
+                area = self.overlay_window.get_area()
+                self.area_selector.set_flask_area(
+                    area['x'], area['y'], area['width'], area['height']
+                )
+                self.log_message("検出エリア設定を保存しました")
+                
+        except Exception as e:
+            self.log_message(f"設定保存エラー: {e}")
+    
+    def on_overlay_closed(self):
+        """オーバーレイが閉じられた時の処理"""
+        self.log_message("オーバーレイウィンドウが閉じられました")
+        
+    def apply_preset(self):
+        """プリセットを適用"""
+        try:
+            if self.area_selector is None:
+                from src.features.area_selector import AreaSelector
+                self.area_selector = AreaSelector()
+            
+            selected_preset = self.preset_combo.currentText()
+            if selected_preset != "カスタム":
+                success = self.area_selector.apply_preset(selected_preset)
+                if success:
+                    area = self.area_selector.get_flask_area()
+                    self.current_area_label.setText(f"X: {area['x']}, Y: {area['y']}, W: {area['width']}, H: {area['height']}")
+                    self.x_spinbox.setValue(area['x'])
+                    self.y_spinbox.setValue(area['y'])
+                    self.width_spinbox.setValue(area['width'])
+                    self.height_spinbox.setValue(area['height'])
+                    
+                    if self.overlay_window:
+                        self.overlay_window.set_area(area['x'], area['y'], area['width'], area['height'])
+                        
+                    self.log_message(f"プリセット '{selected_preset}' を適用しました")
+                else:
+                    self.log_message(f"プリセット '{selected_preset}' の適用に失敗しました")
+            
+        except Exception as e:
+            self.log_message(f"プリセット適用エラー: {e}")
+    
+    def apply_manual_settings(self):
+        """手動設定を適用"""
+        try:
+            x = self.x_spinbox.value()
+            y = self.y_spinbox.value()
+            width = self.width_spinbox.value()
+            height = self.height_spinbox.value()
+            
+            if self.area_selector is None:
+                from src.features.area_selector import AreaSelector
+                self.area_selector = AreaSelector()
+            
+            self.area_selector.set_flask_area(x, y, width, height)
+            self.current_area_label.setText(f"X: {x}, Y: {y}, W: {width}, H: {height}")
+            
+            if self.overlay_window:
+                self.overlay_window.set_area(x, y, width, height)
+                
+            self.log_message(f"手動設定を適用しました: ({x}, {y}, {width}, {height})")
+            
+        except Exception as e:
+            self.log_message(f"手動設定適用エラー: {e}")
+    
+    def test_detection(self):
+        """検出テストを実行"""
+        try:
+            if self.area_selector is None:
+                from src.features.area_selector import AreaSelector
+                self.area_selector = AreaSelector()
+            
+            area = self.area_selector.get_flask_area()
+            tincture_area = self.area_selector.get_absolute_tincture_area()
+            
+            # 簡単な検出テスト（実際の画像認識は行わない）
+            self.test_result_label.setText(f"テスト結果: エリア設定確認完了")
+            self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
+            self.log_message(f"Tincture検出エリア: ({tincture_area['x']}, {tincture_area['y']}, {tincture_area['width']}, {tincture_area['height']})")
+            
+        except Exception as e:
+            self.test_result_label.setText(f"テスト結果: エラー - {e}")
+            self.log_message(f"検出テストエラー: {e}")
     
     def update_sensitivity_label(self, value):
         """感度ラベルを更新"""

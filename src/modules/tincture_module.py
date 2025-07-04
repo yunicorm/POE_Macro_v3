@@ -38,10 +38,19 @@ class TinctureModule:
         self.check_interval = config.get('check_interval', 0.1)  # 100ms
         self.min_use_interval = config.get('min_use_interval', 0.5)  # 500ms
         
-        # 単一の検出器のみ初期化
+        # AreaSelectorを初期化
+        try:
+            from features.area_selector import AreaSelector
+            self.area_selector = AreaSelector()
+        except ImportError:
+            logger.warning("AreaSelector not available")
+            self.area_selector = None
+        
+        # 単一の検出器のみ初期化（AreaSelectorを渡す）
         self.detector = TinctureDetector(
             monitor_config=self.monitor_config,
-            sensitivity=self.sensitivity
+            sensitivity=self.sensitivity,
+            area_selector=self.area_selector
         )
         
         # キーボード制御
