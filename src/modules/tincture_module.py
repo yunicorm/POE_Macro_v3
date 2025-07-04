@@ -71,10 +71,13 @@ class TinctureModule:
             'total_uses': 0,
             'successful_detections': 0,
             'failed_detections': 0,
+            'active_detections': 0,
+            'idle_detections': 0,
+            'unknown_detections': 0,
             'last_use_timestamp': None
         }
         
-        logger.info(f"TinctureModule initialized: enabled={self.enabled}, key={self.key}")
+        logger.info(f"TinctureModule initialized: enabled={self.enabled}, key={self.key}, active_detection={self.detector.template_active is not None}")
     
     
     def start(self) -> None:
@@ -119,26 +122,27 @@ class TinctureModule:
             logger.error(f"Error stopping tincture module: {e}")
     
     def _tincture_loop(self) -> None:
-        """簡略化されたループ - Idle状態のみ検出"""
-        logger.info("Tincture monitoring started")
+        """Active状態を考慮したTincture管理ループ"""
+        logger.info("Tincture monitoring started (with Active state detection)")
         logger.debug(f"Detection interval: {self.check_interval}s, Min use interval: {self.min_use_interval}s")
         
         while self.running:
             try:
-                logger.debug("Checking for Tincture Idle state...")
+                # 現在の状態を取得
+                current_state = self.detector.get_tincture_state()
+                logger.debug(f"Current Tincture state: {current_state}")
                 
-                # Idle状態を検出
-                detected = self.detector.detect_tincture_icon()
-                logger.debug(f"Detection result: {detected}")
-                
-                if detected:
-                    # 最小使用間隔をチェック
+                if current_state == "ACTIVE":
+                    # Active状態の場合は何もしない（維持する）
+                    logger.debug("Tincture is ACTIVE - maintaining state")
+                    self.stats['active_detections'] += 1
+                    
+                elif current_state == "IDLE":
+                    # Idle状態でかつ最小使用間隔を満たしている場合のみ使用
                     current_time = time.time()
                     time_since_last_use = current_time - self.last_use_time
-                    logger.debug(f"Time since last use: {time_since_last_use:.2f}s (min required: {self.min_use_interval}s)")
                     
                     if time_since_last_use >= self.min_use_interval:
-                        # Tinctureを使用
                         logger.info(f"Tincture IDLE detected! Using tincture (key: {self.key})")
                         self.keyboard.press_key(self.key)
                         
@@ -146,21 +150,30 @@ class TinctureModule:
                         self.last_use_time = current_time
                         self.stats['total_uses'] += 1
                         self.stats['successful_detections'] += 1
+                        self.stats['idle_detections'] += 1
                         self.stats['last_use_timestamp'] = current_time
                         
                         logger.info(f"Tincture used successfully. Total uses: {self.stats['total_uses']}")
                         
-                        # 使用後は一定時間待機（アクティブ時間を考慮）
-                        logger.debug("Waiting 5 seconds for tincture to become active...")
-                        time.sleep(5.0)  # Tinctureが有効になるまで待機
+                        # 使用後は少し長めに待機（Active状態になるまで）
+                        logger.debug("Waiting 2 seconds for tincture to become active...")
+                        time.sleep(2.0)  # Active状態への移行待ち
                     else:
                         logger.debug(f"Skipping use - minimum interval not met ({time_since_last_use:.2f}s < {self.min_use_interval}s)")
-                else:
+                        self.stats['idle_detections'] += 1
+                        
+                elif current_state == "UNKNOWN":
+                    # UNKNOWN状態
                     self.stats['failed_detections'] += 1
-                    logger.debug("No Tincture IDLE state detected")
+                    self.stats['unknown_detections'] += 1
+                    logger.debug("Tincture state unknown")
+                    
+                else:
+                    # ERROR状態など
+                    self.stats['failed_detections'] += 1
+                    logger.debug(f"Tincture state error or unexpected: {current_state}")
                 
                 # 検出間隔
-                logger.debug(f"Sleeping for {self.check_interval}s before next check...")
                 time.sleep(self.check_interval)
                 
             except Exception as e:
@@ -233,16 +246,33 @@ class TinctureModule:
             'key': self.key,
             'monitor_config': self.monitor_config,
             'sensitivity': self.sensitivity,
-            'stats': self.stats.copy()
+            'stats': {
+                **self.stats,
+                'active_detections': self.stats.get('active_detections', 0),
+                'idle_detections': self.stats.get('idle_detections', 0),
+                'unknown_detections': self.stats.get('unknown_detections', 0)
+            }
         }
     
     def get_status(self) -> Dict[str, Any]:
         """現在のステータスを取得"""
+        # 現在の状態を取得（ステータスチェック時のみ）
+        current_state = "N/A"
+        try:
+            if self.running and self.detector:
+                current_state = self.detector.get_tincture_state()
+        except Exception as e:
+            logger.debug(f"Failed to get current state in get_status: {e}")
+        
         return {
             'enabled': self.enabled,
             'running': self.running,
+            'current_state': current_state,
             'last_use_time': self.last_use_time,
-            'total_uses': self.stats['total_uses']
+            'total_uses': self.stats['total_uses'],
+            'active_detections': self.stats.get('active_detections', 0),
+            'idle_detections': self.stats.get('idle_detections', 0),
+            'unknown_detections': self.stats.get('unknown_detections', 0)
         }
     
     def manual_use(self) -> bool:
@@ -280,6 +310,9 @@ class TinctureModule:
             'total_uses': 0,
             'successful_detections': 0,
             'failed_detections': 0,
+            'active_detections': 0,
+            'idle_detections': 0,
+            'unknown_detections': 0,
             'last_use_timestamp': None
         }
         logger.info("Tincture statistics reset")

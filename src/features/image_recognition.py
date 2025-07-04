@@ -98,27 +98,42 @@ class TinctureDetector:
             except Exception as e:
                 logger.warning(f"[INIT] 検出エリア情報の取得に失敗: {e}")
         
-        # テンプレート画像を読み込み（解像度別は不要）
-        self.template_path = Path("assets/images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png")
-        self.template = None
-        self._load_template()
+        # テンプレート画像を読み込み（Idle + Active状態）
+        self.template_idle_path = Path("assets/images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png")
+        self.template_active_path = Path("assets/images/tincture/sap_of_the_seasons/active/sap_of_the_seasons_active.png")
+        
+        self.template_idle = None
+        self.template_active = None
+        self._load_templates()
         
         logger.info(f"TinctureDetector initialized: monitor={monitor_config}, sensitivity={sensitivity}, mode={self.detection_mode}")
     
-    def _load_template(self):
-        """Idle状態のテンプレート画像を読み込み"""
+    def _load_templates(self):
+        """Idle状態とActive状態のテンプレート画像を読み込み"""
         try:
-            if not self.template_path.exists():
-                raise FileNotFoundError(f"Template not found: {self.template_path}")
+            # Idle状態テンプレート
+            if not self.template_idle_path.exists():
+                raise FileNotFoundError(f"Idle template not found: {self.template_idle_path}")
             
-            self.template = cv2.imread(str(self.template_path))
-            if self.template is None:
-                raise ValueError(f"Failed to load template: {self.template_path}")
+            self.template_idle = cv2.imread(str(self.template_idle_path))
+            if self.template_idle is None:
+                raise ValueError(f"Failed to load idle template: {self.template_idle_path}")
                 
-            logger.info(f"Loaded template: {self.template_path}")
+            logger.info(f"Loaded idle template: {self.template_idle_path}")
+            
+            # Active状態テンプレート
+            if self.template_active_path.exists():
+                self.template_active = cv2.imread(str(self.template_active_path))
+                if self.template_active is not None:
+                    logger.info(f"Loaded active template: {self.template_active_path}")
+                else:
+                    logger.warning(f"Active template file exists but failed to load: {self.template_active_path}")
+            else:
+                logger.warning(f"Active template not found: {self.template_active_path}")
+                logger.warning("Active state detection will be disabled")
             
         except Exception as e:
-            logger.error(f"Failed to load template: {e}")
+            logger.error(f"Failed to load templates: {e}")
             raise
     
     def _capture_screen(self) -> np.ndarray:
@@ -231,9 +246,13 @@ class TinctureDetector:
             return emergency_area
     
     def detect_tincture_icon(self) -> bool:
+        """Tincture Idle状態を検出（下位互換性のため）"""
+        return self.detect_tincture_idle()
+    
+    def detect_tincture_idle(self) -> bool:
         """Tincture Idle状態を検出"""
         try:
-            logger.debug("Starting Tincture detection...")
+            logger.debug("Starting Tincture IDLE detection...")
             
             # 現在の検出エリア設定を出力
             if self.area_selector:
@@ -247,11 +266,11 @@ class TinctureDetector:
                 logger.debug("Using fallback detection area (no area_selector)")
             
             # テンプレートの検証
-            if self.template is None:
-                logger.error("Template not loaded!")
+            if self.template_idle is None:
+                logger.error("Idle template not loaded!")
                 return False
             
-            logger.debug(f"Template shape: {self.template.shape}")
+            logger.debug(f"Idle template shape: {self.template_idle.shape}")
             
             # 画面をキャプチャ
             logger.debug("Capturing screen...")
@@ -260,29 +279,94 @@ class TinctureDetector:
             
             # テンプレートマッチング
             logger.debug(f"Current sensitivity setting: {self.sensitivity}")
-            logger.debug(f"Running template matching with sensitivity: {self.sensitivity}")
-            result = cv2.matchTemplate(screen, self.template, cv2.TM_CCOEFF_NORMED)
+            logger.debug(f"Running idle template matching with sensitivity: {self.sensitivity}")
+            result = cv2.matchTemplate(screen, self.template_idle, cv2.TM_CCOEFF_NORMED)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
             
-            logger.debug(f"Template matching result: min={min_val:.3f}, max={max_val:.3f}, location={max_loc}")
+            logger.debug(f"Idle template matching result: min={min_val:.3f}, max={max_val:.3f}, location={max_loc}")
             
             # 検出判定
             detected = max_val >= self.sensitivity
             comparison_symbol = '>=' if detected else '<'
-            logger.debug(f"Tincture {'detected' if detected else 'NOT detected'} (confidence: {max_val:.3f} {comparison_symbol} {self.sensitivity})")
+            logger.debug(f"Tincture IDLE {'detected' if detected else 'NOT detected'} (confidence: {max_val:.3f} {comparison_symbol} {self.sensitivity})")
             
             if detected:
                 logger.info(f"Tincture IDLE detected! (confidence: {max_val:.3f} >= {self.sensitivity})")
             else:
-                logger.debug(f"Tincture NOT detected (confidence: {max_val:.3f} < {self.sensitivity})")
+                logger.debug(f"Tincture IDLE NOT detected (confidence: {max_val:.3f} < {self.sensitivity})")
             
             return detected
             
         except Exception as e:
-            logger.error(f"Detection failed: {e}")
+            logger.error(f"Idle detection failed: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
+    
+    def detect_tincture_active(self) -> bool:
+        """Tincture Active状態を検出"""
+        try:
+            logger.debug("Starting Tincture ACTIVE detection...")
+            
+            # Active テンプレートの検証
+            if self.template_active is None:
+                logger.debug("Active template not loaded - Active detection disabled")
+                return False
+            
+            logger.debug(f"Active template shape: {self.template_active.shape}")
+            
+            # 画面をキャプチャ
+            logger.debug("Capturing screen for active detection...")
+            screen = self._capture_screen()
+            logger.debug(f"Screen captured, shape: {screen.shape}")
+            
+            # テンプレートマッチング
+            logger.debug(f"Running active template matching with sensitivity: {self.sensitivity}")
+            result = cv2.matchTemplate(screen, self.template_active, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            
+            logger.debug(f"Active template matching result: min={min_val:.3f}, max={max_val:.3f}, location={max_loc}")
+            
+            # 検出判定
+            detected = max_val >= self.sensitivity
+            comparison_symbol = '>=' if detected else '<'
+            logger.debug(f"Tincture ACTIVE {'detected' if detected else 'NOT detected'} (confidence: {max_val:.3f} {comparison_symbol} {self.sensitivity})")
+            
+            if detected:
+                logger.info(f"Tincture ACTIVE detected! (confidence: {max_val:.3f} >= {self.sensitivity})")
+            else:
+                logger.debug(f"Tincture ACTIVE NOT detected (confidence: {max_val:.3f} < {self.sensitivity})")
+            
+            return detected
+            
+        except Exception as e:
+            logger.error(f"Active detection failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
+    
+    def get_tincture_state(self) -> str:
+        """Tincture の現在の状態を取得"""
+        try:
+            logger.debug("Checking tincture state...")
+            
+            # Active状態をチェック（優先）
+            if self.detect_tincture_active():
+                logger.debug("Tincture state determined: ACTIVE")
+                return "ACTIVE"
+            
+            # Idle状態をチェック
+            if self.detect_tincture_idle():
+                logger.debug("Tincture state determined: IDLE")
+                return "IDLE"
+            
+            # どちらも検出されない場合
+            logger.debug("Tincture state determined: UNKNOWN")
+            return "UNKNOWN"
+            
+        except Exception as e:
+            logger.error(f"Error determining tincture state: {e}")
+            return "ERROR"
     
     def get_detection_area_info(self) -> Dict[str, any]:
         """検出エリアの情報を取得（デバッグ用）"""
@@ -362,10 +446,14 @@ class TinctureDetector:
             logger.error(f"Failed to set detection mode: {e}")
             raise
     
-    def reload_template(self) -> None:
+    def reload_templates(self) -> None:
         """テンプレートを再読み込み"""
-        self._load_template()
-        logger.info("Template reloaded")
+        self._load_templates()
+        logger.info("Templates reloaded")
+    
+    def reload_template(self) -> None:
+        """テンプレートを再読み込み（下位互換性のため）"""
+        self.reload_templates()
     
     def update_sensitivity(self, new_sensitivity: float):
         """感度を動的に更新"""
