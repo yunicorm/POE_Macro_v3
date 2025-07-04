@@ -200,7 +200,7 @@ class AreaSelector:
         self.logger.info(f"Tinctureスロットを設定しました: ({relative_x}, {relative_y}, {width}, {height})")
         
     def get_absolute_tincture_area(self) -> Dict:
-        """Tinctureの絶対座標を計算して取得"""
+        """Tinctureの絶対座標を計算して取得（3番スロットのみ）"""
         flask_area = self.get_flask_area()
         tincture_slot = self.get_tincture_slot()
         
@@ -212,6 +212,17 @@ class AreaSelector:
             "y": absolute_y,
             "width": tincture_slot["width"],
             "height": tincture_slot["height"]
+        }
+    
+    def get_full_flask_area_for_tincture(self) -> Dict:
+        """フラスコエリア全体をTincture検出エリアとして取得"""
+        flask_area = self.get_flask_area()
+        
+        return {
+            "x": flask_area["x"],
+            "y": flask_area["y"],
+            "width": flask_area["width"],
+            "height": flask_area["height"]
         }
         
     def apply_preset(self, resolution: str) -> bool:

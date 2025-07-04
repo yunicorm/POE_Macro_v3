@@ -479,23 +479,29 @@ class MainWindow(QMainWindow):
             # 設定を保存
             if 'tincture' not in self.config:
                 self.config['tincture'] = {}
+            
+            # 手動検出モードに設定
+            self.config['tincture']['detection_mode'] = 'manual'
             self.config['tincture']['detection_area'] = new_area
             self.config_manager.save_config(self.config)
             
             # MacroControllerのTinctureモジュールに変更を伝播
             if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
                 if self.macro_controller.tincture_module:
-                    # TinctureModuleの検出エリアを更新
-                    if hasattr(self.macro_controller.tincture_module, 'update_detection_area'):
-                        self.macro_controller.tincture_module.update_detection_area(self.area_selector)
-                        self.log_message("検出エリアをTinctureModuleに更新しました")
+                    # TinctureDetectorの手動検出エリアを更新
+                    detector = self.macro_controller.tincture_module.detector
+                    if detector and hasattr(detector, 'set_detection_mode'):
+                        detector.set_detection_mode('manual', new_area)
+                        self.log_message("手動検出モードに設定して検出エリアを更新しました")
+                    elif detector and hasattr(detector, 'update_manual_detection_area'):
+                        detector.detection_mode = 'manual'
+                        detector.update_manual_detection_area(new_area)
+                        self.log_message("手動検出エリアを更新しました")
                     else:
-                        # フォールバック: 直接TinctureDetectorを更新
-                        if hasattr(self.macro_controller.tincture_module, 'detector'):
-                            detector = self.macro_controller.tincture_module.detector
-                            if detector and hasattr(detector, 'area_selector'):
-                                detector.area_selector = self.area_selector
-                                self.log_message("検出エリアをTinctureDetectorに更新しました")
+                        # フォールバック: AreaSelectorを更新
+                        if hasattr(self.macro_controller.tincture_module, 'update_detection_area'):
+                            self.macro_controller.tincture_module.update_detection_area(self.area_selector)
+                            self.log_message("検出エリアをTinctureModuleに更新しました（フォールバック）")
                 
             self.log_message(f"手動設定を適用しました: ({x}, {y}, {width}, {height})")
             
@@ -510,12 +516,21 @@ class MainWindow(QMainWindow):
                 self.area_selector = AreaSelector()
             
             area = self.area_selector.get_flask_area()
-            tincture_area = self.area_selector.get_absolute_tincture_area()
             
-            # 簡単な検出テスト（実際の画像認識は行わない）
-            self.test_result_label.setText(f"テスト結果: エリア設定確認完了")
-            self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
-            self.log_message(f"Tincture検出エリア: ({tincture_area['x']}, {tincture_area['y']}, {tincture_area['width']}, {tincture_area['height']})")
+            # 検出モードに応じて適切なエリアを表示
+            detection_mode = self.config.get('tincture', {}).get('detection_mode', 'auto_slot3')
+            if detection_mode == 'manual':
+                # 手動モード：フラスコエリア全体
+                manual_area = self.area_selector.get_full_flask_area_for_tincture()
+                self.test_result_label.setText(f"テスト結果: 手動検出モード - フラスコエリア全体")
+                self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
+                self.log_message(f"手動Tincture検出エリア（フラスコ全体）: ({manual_area['x']}, {manual_area['y']}, {manual_area['width']}, {manual_area['height']})")
+            else:
+                # 自動モード：3番スロットのみ
+                tincture_area = self.area_selector.get_absolute_tincture_area()
+                self.test_result_label.setText(f"テスト結果: 自動検出モード - 3番スロットのみ")
+                self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
+                self.log_message(f"自動Tincture検出エリア（3番スロット）: ({tincture_area['x']}, {tincture_area['y']}, {tincture_area['width']}, {tincture_area['height']})")
             
         except Exception as e:
             self.test_result_label.setText(f"テスト結果: エラー - {e}")

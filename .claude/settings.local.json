@@ -7,7 +7,8 @@
       "Bash(python3 -m pip install:*)",
       "Bash(python3:*)",
       "Bash(pip install:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

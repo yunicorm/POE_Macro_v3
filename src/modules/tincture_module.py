@@ -51,11 +51,14 @@ class TinctureModule:
             logger.warning("AreaSelector not available")
             self.area_selector = None
         
-        # 単一の検出器のみ初期化（AreaSelectorを渡す）
+        # 単一の検出器のみ初期化（設定とAreaSelectorを渡す）
+        # TinctureDetectorに全設定を渡して検出モードを適用
+        full_config = {'tincture': config}
         self.detector = TinctureDetector(
             monitor_config=self.monitor_config,
             sensitivity=self.sensitivity,
-            area_selector=self.area_selector
+            area_selector=self.area_selector,
+            config=full_config
         )
         
         # キーボード制御

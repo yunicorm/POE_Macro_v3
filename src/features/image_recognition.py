@@ -21,7 +21,7 @@ class TinctureDetector:
         "Right": 2
     }
     
-    def __init__(self, monitor_config: str = "Primary", sensitivity: float = 0.7, area_selector=None):
+    def __init__(self, monitor_config: str = "Primary", sensitivity: float = 0.7, area_selector=None, config=None):
         """
         TinctureDetector の初期化
         
@@ -29,10 +29,29 @@ class TinctureDetector:
             monitor_config: モニター設定 ("Primary", "Center", "Right")
             sensitivity: 検出感度 (0.5-1.0)
             area_selector: AreaSelectorインスタンス（オプション）
+            config: 設定辞書（検出モード設定含む）
         """
         self.monitor_config = monitor_config
         self.sensitivity = max(0.5, min(1.0, sensitivity))
         self.area_selector = area_selector
+        self.config = config or {}
+        
+        # 検出モードの設定
+        tincture_config = self.config.get('tincture', {})
+        self.detection_mode = tincture_config.get('detection_mode', 'auto_slot3')
+        
+        # 手動検出エリアの設定
+        self.manual_detection_area = None
+        if self.detection_mode == 'manual':
+            manual_area = tincture_config.get('detection_area', {})
+            if manual_area:
+                self.manual_detection_area = {
+                    'top': manual_area.get('y', 1133),
+                    'left': manual_area.get('x', 1680),
+                    'width': manual_area.get('width', 80),
+                    'height': manual_area.get('height', 120)
+                }
+                logger.info(f"Using manual detection area: {self.manual_detection_area}")
         
         # モニター設定の検証
         if monitor_config not in self.MONITOR_CONFIGS:
@@ -52,7 +71,7 @@ class TinctureDetector:
         self.template = None
         self._load_template()
         
-        logger.info(f"TinctureDetector initialized: monitor={monitor_config}, sensitivity={sensitivity}")
+        logger.info(f"TinctureDetector initialized: monitor={monitor_config}, sensitivity={sensitivity}, mode={self.detection_mode}")
     
     def _load_template(self):
         """Idle状態のテンプレート画像を読み込み"""
@@ -73,8 +92,14 @@ class TinctureDetector:
     def _capture_screen(self) -> np.ndarray:
         """画面をキャプチャ（検出エリア限定）"""
         try:
-            # AreaSelectorから検出エリアを取得
-            if self.area_selector:
+            # 検出モードに応じてエリアを決定
+            if self.detection_mode == 'manual' and self.manual_detection_area:
+                # 手動設定エリアを使用
+                capture_area = self.manual_detection_area.copy()
+                logger.debug(f"Using manual detection area: {capture_area}")
+                logger.debug(f"Manual area details - X:{capture_area['left']}, Y:{capture_area['top']}, W:{capture_area['width']}, H:{capture_area['height']}")
+            elif self.area_selector:
+                # AreaSelectorから検出エリアを取得（従来の方法）
                 try:
                     tincture_area = self.area_selector.get_absolute_tincture_area()
                     capture_area = {
@@ -83,8 +108,8 @@ class TinctureDetector:
                         'width': tincture_area['width'],
                         'height': tincture_area['height']
                     }
-                    logger.debug(f"Using configured tincture detection area: {capture_area}")
-                    logger.debug(f"Tincture area details - X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
+                    logger.debug(f"Using AreaSelector tincture detection area: {capture_area}")
+                    logger.debug(f"AreaSelector area details - X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
                 except Exception as e:
                     logger.warning(f"Failed to get configured area, using fallback: {e}")
                     capture_area = self._get_fallback_area()
@@ -236,6 +261,37 @@ class TinctureDetector:
         """検出感度を更新"""
         self.sensitivity = max(0.5, min(1.0, new_sensitivity))
         logger.info(f"Sensitivity updated to: {self.sensitivity}")
+    
+    def update_manual_detection_area(self, area_dict: dict):
+        """手動検出エリアを更新"""
+        try:
+            if self.detection_mode == 'manual':
+                self.manual_detection_area = {
+                    'top': area_dict.get('y', area_dict.get('top', 1133)),
+                    'left': area_dict.get('x', area_dict.get('left', 1680)),
+                    'width': area_dict.get('width', 80),
+                    'height': area_dict.get('height', 120)
+                }
+                logger.info(f"Updated manual detection area: {self.manual_detection_area}")
+            else:
+                logger.warning("Cannot update manual detection area: detection mode is not manual")
+        except Exception as e:
+            logger.error(f"Failed to update manual detection area: {e}")
+            raise
+    
+    def set_detection_mode(self, mode: str, area_dict: dict = None):
+        """検出モードを設定"""
+        try:
+            if mode in ['manual', 'auto_slot3']:
+                self.detection_mode = mode
+                if mode == 'manual' and area_dict:
+                    self.update_manual_detection_area(area_dict)
+                logger.info(f"Detection mode set to: {mode}")
+            else:
+                raise ValueError(f"Invalid detection mode: {mode}")
+        except Exception as e:
+            logger.error(f"Failed to set detection mode: {e}")
+            raise
     
     def reload_template(self) -> None:
         """テンプレートを再読み込み"""

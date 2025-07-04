@@ -77,8 +77,15 @@ tincture:
   sensitivity: 0.7
   check_interval: 0.1  # seconds
   min_use_interval: 0.5  # seconds
-  # 3440x1440解像度での3番スロット座標（ウルトラワイド）
+  detection_mode: "manual"  # "manual" or "auto_slot3"
+  # 手動設定エリア（フラスコエリア全体）
   detection_area:
+    x: 1680    # 検出エリアのX座標
+    y: 1133    # 検出エリアのY座標
+    width: 80  # 検出エリアの幅
+    height: 120 # 検出エリアの高さ
+  # 3番スロット自動計算用の設定（auto_slot3モード時）
+  auto_slot3_config:
     x: 1680    # 3番スロットのX座標
     y: 1133    # フラスコエリアのY座標
     width: 80  # Tinctureの幅
