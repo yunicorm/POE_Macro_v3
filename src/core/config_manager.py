@@ -95,6 +95,15 @@ class ConfigManager:
             logger.error(f"Failed to save user config: {e}")
             raise
     
+    def save_config(self, config: Dict[str, Any]) -> None:
+        """設定を保存（内部設定を更新してユーザー設定として保存）"""
+        try:
+            self.config = config
+            self.save_user_config()
+        except Exception as e:
+            logger.error(f"Failed to save config: {e}")
+            raise
+    
     def _merge_config(self, base: Dict, override: Dict) -> None:
         """設定を再帰的にマージ"""
         for key, value in override.items():

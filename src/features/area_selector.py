@@ -39,6 +39,25 @@ class AreaSelector:
                 "y": 1700,
                 "width": 800,
                 "height": 240
+            },
+            # ウルトラワイド解像度を追加
+            "3440x1440": {
+                "x": 1370,
+                "y": 1133,
+                "width": 700,
+                "height": 160
+            },
+            "2560x1080": {
+                "x": 830,
+                "y": 850,
+                "width": 500,
+                "height": 120
+            },
+            "5120x1440": {
+                "x": 2210,
+                "y": 1133,
+                "width": 700,
+                "height": 160
             }
         }
         
@@ -215,7 +234,82 @@ class AreaSelector:
     def apply_current_resolution_preset(self) -> bool:
         """現在の解像度のプリセットを適用"""
         current_resolution = self.get_current_resolution()
-        return self.apply_preset(current_resolution)
+        return self.detect_and_apply_resolution()
+        
+    def detect_and_apply_resolution(self) -> bool:
+        """現在の解像度を検出して適切なプリセットを適用"""
+        current_resolution = self.get_current_resolution()
+        self.logger.info(f"検出された解像度: {current_resolution}")
+        
+        # 完全一致するプリセットがあるか確認
+        if current_resolution in self.presets:
+            success = self.apply_preset(current_resolution)
+            self.logger.info(f"プリセットを適用しました: {current_resolution}")
+            return success
+        else:
+            # 最も近い解像度を見つけてスケーリング
+            closest = self.find_closest_resolution(current_resolution)
+            success = self.apply_scaled_preset(closest, current_resolution)
+            self.logger.warning(f"完全一致なし {current_resolution}, {closest}からスケーリング")
+            return success
+            
+    def find_closest_resolution(self, target_resolution: str) -> str:
+        """最も近い解像度のプリセットを見つける"""
+        try:
+            target_width, target_height = map(int, target_resolution.split('x'))
+            target_ratio = target_width / target_height
+            
+            closest_resolution = "1920x1080"  # デフォルト
+            min_ratio_diff = float('inf')
+            
+            for resolution in self.presets.keys():
+                width, height = map(int, resolution.split('x'))
+                ratio = width / height
+                ratio_diff = abs(ratio - target_ratio)
+                
+                if ratio_diff < min_ratio_diff:
+                    min_ratio_diff = ratio_diff
+                    closest_resolution = resolution
+                    
+            self.logger.info(f"最も近い解像度: {closest_resolution}")
+            return closest_resolution
+            
+        except Exception as e:
+            self.logger.error(f"最適解像度の検出に失敗: {e}")
+            return "1920x1080"
+            
+    def apply_scaled_preset(self, base_resolution: str, target_resolution: str) -> bool:
+        """基準解像度からターゲット解像度にスケーリングして適用"""
+        try:
+            base_width, base_height = map(int, base_resolution.split('x'))
+            target_width, target_height = map(int, target_resolution.split('x'))
+            
+            scale_x = target_width / base_width
+            scale_y = target_height / base_height
+            
+            base_preset = self.presets[base_resolution]
+            
+            scaled_preset = {
+                "x": int(base_preset["x"] * scale_x),
+                "y": int(base_preset["y"] * scale_y),
+                "width": int(base_preset["width"] * scale_x),
+                "height": int(base_preset["height"] * scale_y)
+            }
+            
+            self.set_flask_area(
+                scaled_preset["x"],
+                scaled_preset["y"],
+                scaled_preset["width"],
+                scaled_preset["height"]
+            )
+            
+            self.logger.info(f"スケール適用: {base_resolution} -> {target_resolution}, "
+                           f"scale=({scale_x:.2f}, {scale_y:.2f})")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"スケーリング適用に失敗: {e}")
+            return False
         
     def get_monitor_info(self) -> Dict:
         """モニター情報を取得"""

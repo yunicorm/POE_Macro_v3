@@ -1,9 +1,9 @@
 flask_area:
-  height: 131
+  height: 150
   monitor: 0
-  width: 327
-  x: 969
-  y: 1305
+  width: 400
+  x: 932
+  y: 1289
 metadata:
   created_date: '2025-07-04'
   description: POE Macro v3.0 Flask Detection Areas Configuration

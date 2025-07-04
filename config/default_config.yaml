@@ -77,6 +77,12 @@ tincture:
   sensitivity: 0.7
   check_interval: 0.1  # seconds
   min_use_interval: 0.5  # seconds
+  # 3440x1440解像度での3番スロット座標（ウルトラワイド）
+  detection_area:
+    x: 1680    # 3番スロットのX座標
+    y: 1133    # フラスコエリアのY座標
+    width: 80  # Tinctureの幅
+    height: 120 # Tinctureの高さ
 
 # Log monitoring settings
 log_monitor:

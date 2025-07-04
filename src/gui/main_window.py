@@ -247,25 +247,34 @@ class MainWindow(QMainWindow):
         area_group = QGroupBox("検出エリア設定")
         area_layout = QGridLayout(area_group)
         
+        # 現在の解像度表示
+        area_layout.addWidget(QLabel("検出された解像度:"), 0, 0)
+        self.resolution_label = QLabel("1920x1080")
+        area_layout.addWidget(self.resolution_label, 0, 1)
+        
+        # ウルトラワイド推奨情報
+        self.suggestion_label = QLabel("")
+        area_layout.addWidget(self.suggestion_label, 0, 2)
+        
         # 現在の設定表示
-        area_layout.addWidget(QLabel("現在の検出エリア:"), 0, 0)
+        area_layout.addWidget(QLabel("現在の検出エリア:"), 1, 0)
         self.current_area_label = QLabel("X: 245, Y: 850, W: 400, H: 120")
-        area_layout.addWidget(self.current_area_label, 0, 1, 1, 2)
+        area_layout.addWidget(self.current_area_label, 1, 1, 1, 2)
         
         # プリセット選択
-        area_layout.addWidget(QLabel("プリセット:"), 1, 0)
+        area_layout.addWidget(QLabel("プリセット:"), 2, 0)
         self.preset_combo = QComboBox()
-        self.preset_combo.addItems(["1920x1080", "2560x1440", "3840x2160", "カスタム"])
-        area_layout.addWidget(self.preset_combo, 1, 1)
+        self.preset_combo.addItems(["1920x1080", "2560x1440", "3840x2160", "3440x1440", "2560x1080", "5120x1440", "カスタム"])
+        area_layout.addWidget(self.preset_combo, 2, 1)
         
         self.apply_preset_btn = QPushButton("プリセット適用")
         self.apply_preset_btn.clicked.connect(self.apply_preset)
-        area_layout.addWidget(self.apply_preset_btn, 1, 2)
+        area_layout.addWidget(self.apply_preset_btn, 2, 2)
         
         # オーバーレイ表示ボタン
         self.show_overlay_btn = QPushButton("検出エリア設定を開く")
         self.show_overlay_btn.clicked.connect(self.show_overlay_window)
-        area_layout.addWidget(self.show_overlay_btn, 2, 0, 1, 3)
+        area_layout.addWidget(self.show_overlay_btn, 3, 0, 1, 3)
         
         layout.addWidget(area_group)
         
@@ -324,6 +333,9 @@ class MainWindow(QMainWindow):
         self.overlay_window = None
         self.area_selector = None
         
+        # 解像度情報を更新
+        self.update_resolution_info()
+        
     def show_overlay_window(self):
         """オーバーレイウィンドウを表示"""
         try:
@@ -379,6 +391,36 @@ class MainWindow(QMainWindow):
         """オーバーレイが閉じられた時の処理"""
         self.log_message("オーバーレイウィンドウが閉じられました")
         
+    def update_resolution_info(self):
+        """現在の解像度情報を表示"""
+        try:
+            if self.area_selector is None:
+                from src.features.area_selector import AreaSelector
+                self.area_selector = AreaSelector()
+                
+            resolution = self.area_selector.get_current_resolution()
+            self.resolution_label.setText(f"{resolution}")
+            
+            # ウルトラワイド解像度の場合の推奨座標を表示
+            if resolution == "3440x1440":
+                self.suggestion_label.setText("ウルトラワイド: 3番スロット推奨 X:1680, Y:1133")
+            elif resolution == "2560x1080":
+                self.suggestion_label.setText("ウルトラワイド: 3番スロット推奨 X:1080, Y:850")
+            elif resolution == "5120x1440":
+                self.suggestion_label.setText("5K ウルトラワイド: 3番スロット推奨 X:2560, Y:1133")
+            else:
+                self.suggestion_label.setText("")
+                
+            # 現在の設定プリセットを選択
+            if resolution in ["1920x1080", "2560x1440", "3840x2160", "3440x1440", "2560x1080", "5120x1440"]:
+                index = self.preset_combo.findText(resolution)
+                if index >= 0:
+                    self.preset_combo.setCurrentIndex(index)
+                    
+        except Exception as e:
+            self.log_message(f"解像度情報の更新エラー: {e}")
+            self.resolution_label.setText("取得エラー")
+        
     def apply_preset(self):
         """プリセットを適用"""
         try:
@@ -408,7 +450,7 @@ class MainWindow(QMainWindow):
             self.log_message(f"プリセット適用エラー: {e}")
     
     def apply_manual_settings(self):
-        """手動設定を適用"""
+        """手動設定を適用してモジュールを更新"""
         try:
             x = self.x_spinbox.value()
             y = self.y_spinbox.value()
@@ -419,11 +461,41 @@ class MainWindow(QMainWindow):
                 from src.features.area_selector import AreaSelector
                 self.area_selector = AreaSelector()
             
+            # エリア設定を更新
             self.area_selector.set_flask_area(x, y, width, height)
             self.current_area_label.setText(f"X: {x}, Y: {y}, W: {width}, H: {height}")
             
             if self.overlay_window:
                 self.overlay_window.set_area(x, y, width, height)
+            
+            # 設定ファイルを更新
+            new_area = {
+                'x': x,
+                'y': y,
+                'width': width,
+                'height': height
+            }
+            
+            # 設定を保存
+            if 'tincture' not in self.config:
+                self.config['tincture'] = {}
+            self.config['tincture']['detection_area'] = new_area
+            self.config_manager.save_config(self.config)
+            
+            # MacroControllerのTinctureモジュールに変更を伝播
+            if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
+                if self.macro_controller.tincture_module:
+                    # TinctureModuleの検出エリアを更新
+                    if hasattr(self.macro_controller.tincture_module, 'update_detection_area'):
+                        self.macro_controller.tincture_module.update_detection_area(self.area_selector)
+                        self.log_message("検出エリアをTinctureModuleに更新しました")
+                    else:
+                        # フォールバック: 直接TinctureDetectorを更新
+                        if hasattr(self.macro_controller.tincture_module, 'detector'):
+                            detector = self.macro_controller.tincture_module.detector
+                            if detector and hasattr(detector, 'area_selector'):
+                                detector.area_selector = self.area_selector
+                                self.log_message("検出エリアをTinctureDetectorに更新しました")
                 
             self.log_message(f"手動設定を適用しました: ({x}, {y}, {width}, {height})")
             

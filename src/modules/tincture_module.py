@@ -8,9 +8,9 @@ import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-from features.image_recognition import TinctureDetector
-from utils.keyboard_input import KeyboardController
-from core.config_manager import ConfigManager
+from src.features.image_recognition import TinctureDetector
+from src.utils.keyboard_input import KeyboardController
+from src.core.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class TinctureModule:
         
         # AreaSelectorを初期化
         try:
-            from features.area_selector import AreaSelector
+            from src.features.area_selector import AreaSelector
             self.area_selector = AreaSelector()
         except ImportError:
             logger.warning("AreaSelector not available")
@@ -199,6 +199,22 @@ class TinctureModule:
             
         except Exception as e:
             logger.error(f"Failed to update tincture configuration: {e}")
+    
+    def update_detection_area(self, new_area_selector):
+        """検出エリアを動的に更新"""
+        try:
+            self.area_selector = new_area_selector
+            
+            # TinctureDetectorのarea_selectorを更新
+            if self.detector:
+                self.detector.area_selector = new_area_selector
+                logger.info("Detection area updated successfully in TinctureModule")
+            else:
+                logger.warning("TinctureDetector not available for area update")
+                
+        except Exception as e:
+            logger.error(f"Error updating detection area: {e}")
+            raise
     
     def get_stats(self) -> Dict[str, Any]:
         """統計情報を取得"""

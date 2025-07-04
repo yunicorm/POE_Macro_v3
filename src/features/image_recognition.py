@@ -41,7 +41,7 @@ class TinctureDetector:
         # AreaSelectorを初期化（提供されていない場合）
         if self.area_selector is None:
             try:
-                from features.area_selector import AreaSelector
+                from src.features.area_selector import AreaSelector
                 self.area_selector = AreaSelector()
             except ImportError:
                 logger.warning("AreaSelector not available, using fallback detection area")
@@ -84,6 +84,7 @@ class TinctureDetector:
                         'height': tincture_area['height']
                     }
                     logger.debug(f"Using configured tincture detection area: {capture_area}")
+                    logger.debug(f"Tincture area details - X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
                 except Exception as e:
                     logger.warning(f"Failed to get configured area, using fallback: {e}")
                     capture_area = self._get_fallback_area()
@@ -144,6 +145,16 @@ class TinctureDetector:
         """Tincture Idle状態を検出"""
         try:
             logger.debug("Starting Tincture detection...")
+            
+            # 現在の検出エリア設定を出力
+            if self.area_selector:
+                try:
+                    tincture_area = self.area_selector.get_absolute_tincture_area()
+                    logger.debug(f"Current detection area: X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
+                except Exception as e:
+                    logger.warning(f"Failed to get current detection area: {e}")
+            else:
+                logger.debug("Using fallback detection area (no area_selector)")
             
             # テンプレートの検証
             if self.template is None:
