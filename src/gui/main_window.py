@@ -21,6 +21,10 @@ class MainWindow(QMainWindow):
         self.config = config_manager.load_config()
         self.macro_controller = macro_controller
         
+        # MacroControllerにコールバックを設定
+        if self.macro_controller:
+            self.macro_controller.set_status_changed_callback(self.on_macro_status_changed)
+        
         self.setWindowTitle("POE Macro v3.0")
         self.setGeometry(100, 100, 800, 600)
         
@@ -907,6 +911,22 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             logger.error(f"Status update error: {e}")
+    
+    def on_macro_status_changed(self, is_running):
+        """MacroControllerからのステータス変更通知を受け取る"""
+        try:
+            if is_running:
+                self.start_btn.setEnabled(False)
+                self.stop_btn.setEnabled(True)
+                self.statusBar().showMessage("マクロ実行中")
+                self.log_message("マクロが開始されました (F12)")
+            else:
+                self.start_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                self.statusBar().showMessage("Ready")
+                self.log_message("マクロが停止されました (F12)")
+        except Exception as e:
+            logger.error(f"Error in macro status changed callback: {e}")
     
     def log_message(self, message):
         """ログメッセージを表示（安全性チェック付き）"""

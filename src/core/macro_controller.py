@@ -92,6 +92,13 @@ class MacroController:
         
         # グローバルホットキーリスナー
         self.hotkey_listener = None
+        self.toggle_listener = None  # F12トグル用リスナー
+        
+        # MainWindowとの同期用コールバック
+        self.status_changed_callback = None
+        
+        # グローバルホットキーを設定（初期化時に設定）
+        self._setup_global_hotkeys()
         
         logger.info("MacroController initialized successfully")
         
@@ -184,10 +191,12 @@ class MacroController:
             else:
                 logger.info("Tincture module not started - no valid config")
             
-            # 緊急停止ホットキーの設定
-            self._setup_emergency_stop()
+            # ホットキーは初期化時に設定済み
             
             logger.info("MacroController started successfully")
+            
+            # ステータス変更を通知
+            self._notify_status_changed()
             
         except Exception as e:
             import traceback
@@ -231,8 +240,35 @@ class MacroController:
         if self.hotkey_listener:
             self.hotkey_listener.stop()
             self.hotkey_listener = None
+        if self.toggle_listener:
+            self.toggle_listener.stop()
+            self.toggle_listener = None
         
         logger.info("MacroController stopped")
+        
+        # ステータス変更を通知
+        self._notify_status_changed()
+    
+    def toggle(self):
+        """マクロの開始/停止をトグル"""
+        if self.running:
+            logger.info("Toggling macro OFF")
+            self.stop()
+        else:
+            logger.info("Toggling macro ON")
+            self.start()
+    
+    def set_status_changed_callback(self, callback):
+        """MainWindowとの同期用コールバックを設定"""
+        self.status_changed_callback = callback
+    
+    def _notify_status_changed(self):
+        """ステータス変更をMainWindowに通知"""
+        if self.status_changed_callback:
+            try:
+                self.status_changed_callback(self.running)
+            except Exception as e:
+                logger.error(f"Error in status change callback: {e}")
     
     def restart(self):
         """全マクロモジュールを再起動"""
@@ -316,21 +352,75 @@ class MacroController:
                 'tincture': {'running': False, 'current_state': 'ERROR', 'stats': {}}
             }
     
-    def _setup_emergency_stop(self):
-        """緊急停止ホットキー（F12）を設定"""
-        def on_press(key):
+    def _setup_global_hotkeys(self):
+        """ホットキーを設定（緊急停止: Ctrl+Shift+F12, トグル: F12）"""
+        # 既存のリスナーを停止
+        if self.hotkey_listener:
+            self.hotkey_listener.stop()
+            self.hotkey_listener = None
+        if self.toggle_listener:
+            self.toggle_listener.stop()
+            self.toggle_listener = None
+        
+        # Ctrl+Shift+F12 緊急停止用
+        def on_press_emergency(key):
             try:
-                if key == pynput.keyboard.Key.f12:
-                    logger.warning("Emergency stop triggered (F12)")
+                # 現在押されているキーを追跡
+                current_keys = getattr(on_press_emergency, 'current_keys', set())
+                
+                if hasattr(key, 'char'):
+                    current_keys.add(key)
+                elif hasattr(key, 'name'):
+                    current_keys.add(key)
+                
+                # Ctrl+Shift+F12の検出
+                ctrl_pressed = any(k in current_keys for k in [pynput.keyboard.Key.ctrl_l, pynput.keyboard.Key.ctrl_r])
+                shift_pressed = any(k in current_keys for k in [pynput.keyboard.Key.shift_l, pynput.keyboard.Key.shift_r])
+                
+                if ctrl_pressed and shift_pressed and key == pynput.keyboard.Key.f12:
+                    logger.warning("Emergency stop triggered (Ctrl+Shift+F12)")
+                    self.emergency_stop = True
                     self.stop()
-                    return False  # リスナーを停止
+                    # プログラムを終了
+                    import sys
+                    sys.exit(0)
+                
+                on_press_emergency.current_keys = current_keys
+                
             except Exception as e:
                 logger.error(f"Error in emergency stop handler: {e}")
         
-        self.hotkey_listener = pynput.keyboard.Listener(on_press=on_press)
+        def on_release_emergency(key):
+            try:
+                current_keys = getattr(on_press_emergency, 'current_keys', set())
+                current_keys.discard(key)
+                on_press_emergency.current_keys = current_keys
+            except Exception as e:
+                logger.error(f"Error in key release handler: {e}")
+        
+        # F12トグル用
+        def on_press_toggle(key):
+            try:
+                if key == pynput.keyboard.Key.f12:
+                    logger.info("Toggle triggered (F12)")
+                    self.toggle()
+            except Exception as e:
+                logger.error(f"Error in toggle handler: {e}")
+        
+        # 緊急停止リスナー
+        self.hotkey_listener = pynput.keyboard.Listener(
+            on_press=on_press_emergency,
+            on_release=on_release_emergency
+        )
         self.hotkey_listener.daemon = True
         self.hotkey_listener.start()
-        logger.info("Emergency stop hotkey (F12) registered")
+        
+        # トグルリスナー
+        self.toggle_listener = pynput.keyboard.Listener(on_press=on_press_toggle)
+        self.toggle_listener.daemon = True
+        self.toggle_listener.start()
+        
+        logger.info("Hotkeys registered - Toggle: F12, Emergency stop: Ctrl+Shift+F12")
     
     def manual_flask_use(self, slot: str):
         """手動でフラスコを使用"""
