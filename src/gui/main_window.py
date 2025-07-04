@@ -258,7 +258,7 @@ class MainWindow(QMainWindow):
         
         # 現在の設定表示
         area_layout.addWidget(QLabel("現在の検出エリア:"), 1, 0)
-        self.current_area_label = QLabel("X: 245, Y: 850, W: 400, H: 120")
+        self.current_area_label = QLabel("読み込み中...")
         area_layout.addWidget(self.current_area_label, 1, 1, 1, 2)
         
         # プリセット選択
@@ -298,25 +298,25 @@ class MainWindow(QMainWindow):
         detail_layout.addWidget(QLabel("X座標:"), 0, 0)
         self.x_spinbox = QSpinBox()
         self.x_spinbox.setRange(0, 3840)
-        self.x_spinbox.setValue(245)
+        self.x_spinbox.setValue(0)  # 初期値は0、後で設定ファイルから読み込み
         detail_layout.addWidget(self.x_spinbox, 0, 1)
         
         detail_layout.addWidget(QLabel("Y座標:"), 0, 2)
         self.y_spinbox = QSpinBox()
         self.y_spinbox.setRange(0, 2160)
-        self.y_spinbox.setValue(850)
+        self.y_spinbox.setValue(0)  # 初期値は0、後で設定ファイルから読み込み
         detail_layout.addWidget(self.y_spinbox, 0, 3)
         
         detail_layout.addWidget(QLabel("幅:"), 1, 0)
         self.width_spinbox = QSpinBox()
         self.width_spinbox.setRange(100, 800)
-        self.width_spinbox.setValue(400)
+        self.width_spinbox.setValue(0)  # 初期値は0、後で設定ファイルから読み込み
         detail_layout.addWidget(self.width_spinbox, 1, 1)
         
         detail_layout.addWidget(QLabel("高さ:"), 1, 2)
         self.height_spinbox = QSpinBox()
         self.height_spinbox.setRange(50, 240)
-        self.height_spinbox.setValue(120)
+        self.height_spinbox.setValue(0)  # 初期値は0、後で設定ファイルから読み込み
         detail_layout.addWidget(self.height_spinbox, 1, 3)
         
         self.apply_manual_btn = QPushButton("手動設定を適用")
@@ -346,6 +346,9 @@ class MainWindow(QMainWindow):
                 # AreaSelectorを初期化
                 self.area_selector = AreaSelector()
                 current_area = self.area_selector.get_flask_area()
+                
+                # デバッグログ: オーバーレイ作成時の座標
+                self.log_message(f"[OVERLAY] オーバーレイ作成用座標: X={current_area.get('x', 245)}, Y={current_area.get('y', 850)}, W={current_area.get('width', 400)}, H={current_area.get('height', 120)}")
                 
                 # オーバーレイウィンドウを作成
                 self.overlay_window = OverlayWindow(
@@ -479,7 +482,7 @@ class MainWindow(QMainWindow):
         self.log_message("オーバーレイウィンドウが閉じられました")
         
     def update_resolution_info(self):
-        """現在の解像度情報を表示"""
+        """現在の解像度情報を表示し、実際の設定ファイルから座標を読み込み"""
         try:
             if self.area_selector is None:
                 from src.features.area_selector import AreaSelector
@@ -487,6 +490,17 @@ class MainWindow(QMainWindow):
                 
             resolution = self.area_selector.get_current_resolution()
             self.resolution_label.setText(f"{resolution}")
+            
+            # **重要**: 実際の設定ファイルから現在の座標を読み込み
+            current_area = self.area_selector.get_flask_area()
+            self.log_message(f"[LOAD] 設定ファイルから読み込み: X={current_area['x']}, Y={current_area['y']}, W={current_area['width']}, H={current_area['height']}")
+            
+            # GUI表示を実際の設定値で更新
+            self.current_area_label.setText(f"X: {current_area['x']}, Y: {current_area['y']}, W: {current_area['width']}, H: {current_area['height']}")
+            self.x_spinbox.setValue(current_area['x'])
+            self.y_spinbox.setValue(current_area['y'])
+            self.width_spinbox.setValue(current_area['width'])
+            self.height_spinbox.setValue(current_area['height'])
             
             # ウルトラワイド解像度の場合の推奨座標を表示
             if resolution == "3440x1440":
@@ -507,6 +521,12 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.log_message(f"解像度情報の更新エラー: {e}")
             self.resolution_label.setText("取得エラー")
+            # エラー時はデフォルト値を設定
+            self.current_area_label.setText("エラー: 設定を確認してください")
+            self.x_spinbox.setValue(245)
+            self.y_spinbox.setValue(850)
+            self.width_spinbox.setValue(400)
+            self.height_spinbox.setValue(120)
         
     def apply_preset(self):
         """プリセットを適用"""

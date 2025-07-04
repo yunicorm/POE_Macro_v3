@@ -608,3 +608,199 @@ python test_tincture_debug.py
   - 3番スロット計算: X:1111, Y:1305, W:60, H:100
 
 これにより、オーバーレイで設定したフラスコエリア全体でのTincture検出が可能となり、検出精度と使いやすさが大幅に向上しました。
+
+## 2025-07-05 座標不整合問題の根本修正
+
+### 🚨 **重大な問題と修正** - GUI設定変更が実行時に反映されない問題
+
+#### **問題の症状**
+- オーバーレイ表示座標: X:914, Y:1279, W:400, H:160
+- GUI設定ウィンドウ表示: X:245, Y:860, W:400, H:120  
+- 両者が大きく異なり、設定変更が反映されない
+
+#### **根本原因の特定**
+- [x] **GUI初期化時のハードコーディング問題**
+  - `main_window.py`でX:245, Y:860, W:400, H:120が固定値として設定
+  - 実際の設定ファイル値（detection_areas.yaml）が読み込まれていない
+  - `update_resolution_info()`が呼ばれても座標反映なし
+
+- [x] **設定読み込みタイミングの問題**
+  - GUI作成時に設定ファイルからの値読み込みが行われていない
+  - SpinBoxの初期値がハードコーディングされている
+  - オーバーレイは正しい座標で作成されるがGUIは古い値を表示
+
+- [x] **on_settings_saved()メソッドの不完全性**
+  - AreaSelectorの更新のみで、default_config.yamlやTinctureDetectorの更新なし
+  - 設定変更がTinctureDetectorに伝播されていない
+  - 再初期化機能なし
+
+### ✅ **包括的修正内容**
+
+#### **1. GUI初期化の完全改修**
+```python
+# Before (問題のあるコード)
+self.current_area_label = QLabel("X: 245, Y: 850, W: 400, H: 120")
+self.x_spinbox.setValue(245)
+self.y_spinbox.setValue(850)
+
+# After (修正後)
+self.current_area_label = QLabel("読み込み中...")
+self.x_spinbox.setValue(0)  # 後で設定ファイルから読み込み
+self.y_spinbox.setValue(0)  # 後で設定ファイルから読み込み
+```
+
+#### **2. update_resolution_info()メソッドの強化**
+```python
+def update_resolution_info(self):
+    """現在の解像度情報を表示し、実際の設定ファイルから座標を読み込み"""
+    # **重要**: 実際の設定ファイルから現在の座標を読み込み
+    current_area = self.area_selector.get_flask_area()
+    self.log_message(f"[LOAD] 設定ファイルから読み込み: X={x}, Y={y}, W={w}, H={h}")
+    
+    # GUI表示を実際の設定値で更新
+    self.current_area_label.setText(f"X: {current_area['x']}, Y: {current_area['y']}, ...")
+    self.x_spinbox.setValue(current_area['x'])
+    self.y_spinbox.setValue(current_area['y'])
+    # ...
+```
+
+#### **3. on_settings_saved()メソッドの包括的改修**
+```python
+def on_settings_saved(self):
+    """設定が保存された時の処理（包括的設定更新）"""
+    # AreaSelector更新
+    # GUI表示更新  
+    # default_config.yaml更新
+    # TinctureDetector再初期化
+    # 詳細ログ出力
+    self._update_tincture_detector_settings()
+```
+
+#### **4. TinctureDetector再初期化機能追加**
+```python
+def _reinitialize_tincture_detector(self):
+    """TinctureDetectorを再初期化して新しい設定を確実に適用"""
+    # 現在設定取得
+    # 新しいTinctureDetectorインスタンス作成
+    # 既存インスタンス置き換え
+```
+
+#### **5. 詳細デバッグログシステム実装**
+
+**AreaSelector強化:**
+```python
+def get_flask_area(self) -> Dict:
+    self.logger.info(f"[GET] 設定データから取得: {flask_area}")
+    self.logger.info(f"[GET] 正常な設定値を返却: X={x}, Y={y}, W={w}, H={h}")
+
+def set_flask_area(self, x, y, width, height):
+    self.logger.info(f"[SET] フラスコエリア設定開始: X={x}, Y={y}, W={w}, H={h}")
+    self.logger.info(f"[SET] 設定ファイル保存成功: X={x}, Y={y}, W={w}, H={h}")
+```
+
+**TinctureDetector初期化時:**
+```python
+logger.info(f"[INIT] TinctureDetector初期化開始")
+logger.info(f"[INIT] 設定された検出モード: {self.detection_mode}")
+logger.info(f"[INIT] フラスコエリア全体検出: X={x}, Y={y}, W={w}, H={h}")
+```
+
+**画面キャプチャ時:**
+```python
+logger.info(f"[DETECTION] モード: {mode} - 詳細説明")
+logger.info(f"[DETECTION] エリア座標: X={x}, Y={y}, W={w}, H={h}")
+logger.info(f"[DETECTION] 検出範囲面積: {area}px²")
+```
+
+#### **6. 包括的診断ツール作成**
+
+**test_coordinate_sync.py の機能:**
+- 設定ファイル整合性チェック
+- AreaSelector操作の詳細テスト
+- GUI操作ワークフローシミュレーション
+- 座標不整合の自動修正機能
+
+### 🔄 **修正された設定反映フロー**
+
+```
+設定ファイル (detection_areas.yaml)
+X:914, Y:1279, W:400, H:160
+    ↓
+AreaSelector.get_flask_area() 【デバッグログ付き】
+    ↓
+update_resolution_info() 【新機能】
+    ↓
+GUI表示更新 (current_area_label, spinboxes)
+X:914, Y:1279, W:400, H:160
+    ↓
+show_overlay_window() 【デバッグログ付き】
+    ↓
+オーバーレイ作成
+X:914, Y:1279, W:400, H:160
+    ↓
+on_settings_saved() 【包括的改修】
+    ↓
+1. AreaSelector更新
+2. default_config.yaml更新
+3. TinctureDetector再初期化
+4. 完全な設定反映 ✅
+```
+
+### 📊 **修正後の統一座標**
+
+#### **すべてのコンポーネントで同じ値**
+```yaml
+# detection_areas.yaml & default_config.yaml
+flask_area:
+  x: 914
+  y: 1279  
+  width: 400
+  height: 160
+```
+
+- **設定ファイル**: X:914, Y:1279, W:400, H:160
+- **GUI表示**: X:914, Y:1279, W:400, H:160 ✅
+- **オーバーレイ**: X:914, Y:1279, W:400, H:160 ✅
+- **TinctureDetector**: X:914, Y:1279, W:400, H:160 ✅
+
+### 🛡️ **今後の予防策**
+
+#### **1. 必須チェック項目（将来の開発用）**
+- [ ] GUI初期化時にハードコーディング値を使用していないか確認
+- [ ] 設定ファイルから動的に値を読み込んでいるか確認
+- [ ] 設定変更時に全コンポーネントに伝播されているか確認
+- [ ] オーバーレイとGUIの座標が一致しているか確認
+
+#### **2. デバッグログの活用**
+```bash
+# 座標問題発生時の確認コマンド
+python test_coordinate_sync.py
+
+# 期待されるログ出力
+[LOAD] 設定ファイルから読み込み: X=914, Y=1279, W=400, H=160
+[OVERLAY] オーバーレイ作成用座標: X=914, Y=1279, W=400, H=160
+[GET] 正常な設定値を返却: X=914, Y=1279, W=400, H=160
+```
+
+#### **3. 重要な設計原則**
+- **単一の真実の源**: detection_areas.yamlを唯一の座標データソースとする
+- **動的読み込み**: GUIコンポーネントは初期化時に設定ファイルから値を読み込む
+- **包括的更新**: 設定変更時は全関連コンポーネントを更新する
+- **詳細ログ**: 座標の流れを追跡できるデバッグログを維持する
+
+### 🎯 **修正効果**
+
+- ✅ **座標不一致解決**: オーバーレイとGUI設定が同じ値を表示
+- ✅ **ハードコーディング除去**: 設定ファイルからの動的読み込みに変更
+- ✅ **即時反映**: 設定変更が即座に全コンポーネントに反映
+- ✅ **デバッグ性向上**: 詳細ログによる座標追跡が可能
+- ✅ **設定同期**: すべてのコンポーネントで統一された座標値
+
+### ⚠️ **重要な注意事項（今後の開発者向け）**
+
+1. **ハードコーディング禁止**: GUI初期化時に固定座標値を設定しない
+2. **設定ファイル優先**: 常にdetection_areas.yamlから値を読み込む
+3. **包括的更新**: 設定変更時は関連する全てのコンポーネントを更新する
+4. **テスト必須**: 座標変更機能を実装した際は必ずtest_coordinate_sync.pyで検証する
+
+この修正により、GUI設定変更が確実に実行時に反映される堅牢なシステムが完成し、同様の座標不整合問題の再発を防止できます。

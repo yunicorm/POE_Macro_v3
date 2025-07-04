@@ -629,6 +629,148 @@ tincture:
 
 ---
 
+---
+
+## 🚨 座標不整合問題の根本修正（2025-07-05）
+
+### 📋 発生した重大問題
+**症状**: オーバーレイ表示座標（X:914, Y:1279, W:400, H:160）とGUI設定ウィンドウ（X:245, Y:860, W:400, H:120）が大きく異なり、設定変更が実行時に反映されない。
+
+### 🔍 根本原因の特定
+1. **GUI初期化時のハードコーディング問題**
+   ```python
+   # 問題のあるコード
+   self.current_area_label = QLabel("X: 245, Y: 850, W: 400, H: 120")
+   self.x_spinbox.setValue(245)  # 固定値
+   ```
+
+2. **設定読み込みタイミングの問題**
+   - GUI作成時に `detection_areas.yaml` から値を読み込まない
+   - `update_resolution_info()` で座標更新されない
+
+3. **設定変更時の不完全な伝播**
+   - `on_settings_saved()` でAreaSelectorのみ更新
+   - TinctureDetectorの再初期化なし
+
+### ✅ 包括的修正内容
+
+#### 1. GUI初期化の完全改修
+```python
+# Before (問題のあるコード)
+self.current_area_label = QLabel("X: 245, Y: 850, W: 400, H: 120")
+self.x_spinbox.setValue(245)
+
+# After (修正後)  
+self.current_area_label = QLabel("読み込み中...")
+self.x_spinbox.setValue(0)  # 後で設定ファイルから読み込み
+```
+
+#### 2. update_resolution_info()メソッドの強化
+```python
+def update_resolution_info(self):
+    # **重要**: 実際の設定ファイルから現在の座標を読み込み
+    current_area = self.area_selector.get_flask_area()
+    self.log_message(f"[LOAD] 設定ファイルから読み込み: X={x}, Y={y}")
+    
+    # GUI表示を実際の設定値で更新
+    self.current_area_label.setText(f"X: {current_area['x']}, ...")
+    self.x_spinbox.setValue(current_area['x'])
+```
+
+#### 3. on_settings_saved()メソッドの包括的改修
+```python
+def on_settings_saved(self):
+    # AreaSelector更新
+    # GUI表示更新  
+    # default_config.yaml更新
+    # TinctureDetector再初期化
+    self._reinitialize_tincture_detector()
+```
+
+#### 4. TinctureDetector再初期化機能追加
+```python
+def _reinitialize_tincture_detector(self):
+    # 現在設定取得 → 新インスタンス作成 → 既存インスタンス置き換え
+    new_detector = TinctureDetector(config=self.config)
+    tincture_module.detector = new_detector
+```
+
+#### 5. 詳細デバッグログシステム実装
+```python
+# AreaSelector
+self.logger.info(f"[GET] 設定データから取得: {flask_area}")
+self.logger.info(f"[SET] フラスコエリア設定開始: X={x}, Y={y}")
+
+# TinctureDetector  
+logger.info(f"[INIT] TinctureDetector初期化開始")
+logger.info(f"[DETECTION] エリア座標: X={x}, Y={y}, W={w}, H={h}")
+```
+
+### 🛡️ 今後の予防策（重要な開発者向けガイドライン）
+
+#### 必須チェック項目
+- [ ] GUI初期化時にハードコーディング値を使用していないか確認
+- [ ] 設定ファイルから動的に値を読み込んでいるか確認  
+- [ ] 設定変更時に全コンポーネントに伝播されているか確認
+- [ ] オーバーレイとGUIの座標が一致しているか確認
+
+#### 重要な設計原則
+1. **単一の真実の源**: `detection_areas.yaml`を唯一の座標データソース
+2. **動的読み込み**: GUIコンポーネントは初期化時に設定ファイルから値を読み込む
+3. **包括的更新**: 設定変更時は関連する全てのコンポーネントを更新
+4. **詳細ログ**: 座標の流れを追跡できるデバッグログを維持
+
+#### デバッグログの活用
+```bash
+# 座標問題発生時の確認コマンド
+python test_coordinate_sync.py
+
+# 期待されるログ出力
+[LOAD] 設定ファイルから読み込み: X=914, Y=1279, W=400, H=160
+[OVERLAY] オーバーレイ作成用座標: X=914, Y=1279, W=400, H=160
+[GET] 正常な設定値を返却: X=914, Y=1279, W=400, H=160
+```
+
+### ⚠️ 重要な注意事項（今後の開発者向け）
+
+1. **ハードコーディング禁止**: GUI初期化時に固定座標値を設定しない
+2. **設定ファイル優先**: 常に `detection_areas.yaml` から値を読み込む
+3. **包括的更新**: 設定変更時は関連する全てのコンポーネントを更新する
+4. **テスト必須**: 座標変更機能を実装した際は必ず `test_coordinate_sync.py` で検証する
+
+### 🧪 診断ツール
+- **test_coordinate_sync.py**: 座標同期の包括的テスト・自動修正機能
+- **test_settings_reflection.py**: 設定反映のテスト・診断機能
+
+### 🔄 修正された設定反映フロー
+```
+detection_areas.yaml (X:914, Y:1279, W:400, H:160)
+    ↓
+AreaSelector.get_flask_area() 【デバッグログ付き】
+    ↓ 
+update_resolution_info() 【新機能】
+    ↓
+GUI表示更新 (current_area_label, spinboxes)
+    ↓
+show_overlay_window() 【デバッグログ付き】
+    ↓
+on_settings_saved() 【包括的改修】
+    ↓
+1. AreaSelector更新
+2. default_config.yaml更新  
+3. TinctureDetector再初期化
+4. 完全な設定反映 ✅
+```
+
+### 🎯 修正効果
+- ✅ **座標不一致解決**: オーバーレイとGUI設定が同じ値を表示
+- ✅ **ハードコーディング除去**: 設定ファイルからの動的読み込みに変更
+- ✅ **即時反映**: 設定変更が即座に全コンポーネントに反映
+- ✅ **デバッグ性向上**: 詳細ログによる座標追跡が可能
+- ✅ **設定同期**: すべてのコンポーネントで統一された座標値
+
+---
+
 **修正作業完了日**: 2025-07-05  
 **次回セッション**: 依存関係インストール → 実機でのフラスコ全体検出テスト  
-**ステータス**: 🟢 Ready for Production Testing (Full Flask Area Detection)
+**ステータス**: 🟢 Ready for Production Testing (Coordinate Sync Fixed + Full Flask Area Detection)

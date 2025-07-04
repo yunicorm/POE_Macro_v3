@@ -256,32 +256,38 @@ class AreaSelector:
         """フラスコエリアの座標を取得（フォールバック機能付き）"""
         try:
             flask_area = self.config_data.get("flask_area", {})
+            self.logger.info(f"[GET] 設定データから取得: {flask_area}")
             
             # 設定データが空または不正な場合のフォールバック
             if not flask_area or not self._validate_flask_area_data(flask_area):
                 self.logger.warning("フラスコエリア設定が無効です。デフォルト値を使用します")
                 current_resolution = self.get_current_resolution()
                 preset = self.get_preset_for_resolution(current_resolution)
-                return {
+                fallback_area = {
                     "x": preset["x"],
                     "y": preset["y"],
                     "width": preset["width"],
                     "height": preset["height"],
                     "monitor": 0
                 }
+                self.logger.info(f"[GET] フォールバック適用: {fallback_area}")
+                return fallback_area
             
+            self.logger.info(f"[GET] 正常な設定値を返却: X={flask_area['x']}, Y={flask_area['y']}, W={flask_area['width']}, H={flask_area['height']}")
             return flask_area
             
         except Exception as e:
             self.logger.error(f"フラスコエリア取得中にエラーが発生しました: {e}")
             # 最終フォールバック
-            return {
+            emergency_area = {
                 "x": 245,
                 "y": 850,
                 "width": 400,
                 "height": 120,
                 "monitor": 0
             }
+            self.logger.warning(f"[GET] 緊急フォールバック: {emergency_area}")
+            return emergency_area
     
     def _validate_flask_area_data(self, flask_area: dict) -> bool:
         """フラスコエリアデータの妥当性を検証"""
@@ -309,9 +315,16 @@ class AreaSelector:
         
     def set_flask_area(self, x: int, y: int, width: int, height: int, monitor: int = 0):
         """フラスコエリアの座標を設定"""
+        self.logger.info(f"[SET] フラスコエリア設定開始: X={x}, Y={y}, W={width}, H={height}")
+        
         if "flask_area" not in self.config_data:
             self.config_data["flask_area"] = {}
+            self.logger.info(f"[SET] 新規flask_areaセクション作成")
             
+        # 設定前の値をログ出力
+        old_area = self.config_data.get("flask_area", {})
+        self.logger.info(f"[SET] 設定前の値: {old_area}")
+        
         self.config_data["flask_area"].update({
             "x": x,
             "y": y,
@@ -320,8 +333,16 @@ class AreaSelector:
             "monitor": monitor
         })
         
-        self.save_config()
-        self.logger.info(f"フラスコエリアを設定しました: ({x}, {y}, {width}, {height})")
+        # 設定後の値をログ出力
+        new_area = self.config_data["flask_area"]
+        self.logger.info(f"[SET] 設定後の値: {new_area}")
+        
+        # 設定ファイル保存
+        save_success = self.save_config()
+        if save_success:
+            self.logger.info(f"[SET] 設定ファイル保存成功: X={x}, Y={y}, W={width}, H={height}")
+        else:
+            self.logger.error(f"[SET] 設定ファイル保存失敗: X={x}, Y={y}, W={width}, H={height}")
         
     def get_tincture_slot(self) -> Dict:
         """Tinctureスロットの座標を取得"""
