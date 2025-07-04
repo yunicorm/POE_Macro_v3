@@ -47,7 +47,7 @@ POE_Macro_v3/
 - **config_manager.py**: 設定ファイルの読み込み/保存（YAML形式、階層設定対応）
 
 #### 2. Features（高度な機能）
-- **image_recognition.py**: TinctureDetectorクラス（複数解像度対応、状態検出）
+- **image_recognition.py**: TinctureDetectorクラス（最適化済み - 単一テンプレート方式）
 
 #### 3. Utils（ユーティリティ）
 - **keyboard_input.py**: KeyboardControllerクラス（アンチチート対策、ランダム遅延）
@@ -57,7 +57,7 @@ POE_Macro_v3/
 #### 4. Modules（機能モジュール）
 - **flask_module.py**: フラスコ自動使用（基本実装済み）
 - **skill_module.py**: スキル自動使用（基本実装済み）
-- **tincture_module.py**: TinctureModuleクラス（完全実装済み - ステートマシン、マルチスレッド）
+- **tincture_module.py**: TinctureModuleクラス（完全実装済み - 最適化ループ、マルチスレッド）
 - **log_monitor.py**: ログファイル監視（基本実装済み）
 
 #### 5. GUI
@@ -65,16 +65,22 @@ POE_Macro_v3/
 
 ### 実装済みクラス詳細
 
-#### TinctureDetector（src/features/image_recognition.py）
+#### TinctureDetector（src/features/image_recognition.py）【最適化済み】
 ```python
 class TinctureDetector:
     def __init__(self, monitor_config: str, sensitivity: float)
-    def detect_tincture_icon(self) -> bool
+    def detect_tincture_icon(self) -> bool  # Idle状態のみ検出
     def update_sensitivity(self, new_sensitivity: float) -> None
     def get_detection_area_info(self) -> Dict[str, any]
+    def reload_template(self) -> None  # テンプレート再読み込み
 ```
 
-#### TinctureModule（src/modules/tincture_module.py）
+**最適化内容：**
+- 複雑な解像度別テンプレートを単一テンプレートに簡略化
+- IDLE状態のみの検出に特化（ACTIVE/COOLDOWN検出削除）
+- パフォーマンス大幅向上、メンテナンス性改善
+
+#### TinctureModule（src/modules/tincture_module.py）【最適化済み】
 ```python
 class TinctureModule:
     def __init__(self, config: Dict[str, Any])
@@ -83,7 +89,14 @@ class TinctureModule:
     def manual_use(self) -> bool
     def get_stats(self) -> Dict[str, Any]
     def update_config(self, new_config: Dict[str, Any]) -> None
+    def _tincture_loop(self) -> None  # 最適化されたメインループ
 ```
+
+**最適化内容：**
+- 複雑なステートマシン（IDLE/ACTIVE/COOLDOWN/UNKNOWN）を削除
+- シンプルなループ：検出 → 使用 → 5秒待機
+- 設定パス簡略化（`config.tincture.enabled` → `config.enabled`）
+- エラーハンドリング改善、パフォーマンス向上
 
 #### MainWindow（src/gui/main_window.py）
 ```python
@@ -130,10 +143,12 @@ logger.error()  # エラー
 - 適切な停止処理（graceful shutdown）
 - スレッドセーフな実装
 
-### 3. 画像認識の最適化
-- テンプレート画像の事前読み込み
+### 3. 画像認識の最適化【2025-07-04更新】
+- **単一テンプレート方式**: 複雑な解像度別対応を削除
+- **Idle状態特化**: ACTIVE/COOLDOWN検出を削除し軽量化
 - 認識領域の限定（全画面ではなく必要な部分のみ）
 - 閾値の調整可能化
+- **パフォーマンス向上**: メモリ使用量削減、処理速度向上
 
 ### 4. 設定管理
 - デフォルト設定とユーザー設定の分離
@@ -251,15 +266,45 @@ def press_key(self, key: str, delay_range: Tuple[float, float] = (0.05, 0.1)):
     post_delay = random.uniform(0, 0.03)     # 押下後遅延
 ```
 
+## 最新の技術改善（2025-07-04）
+
+### インポートシステムの統一
+- **絶対インポート**: 全ファイルで相対インポートから絶対インポートに統一
+- **エラー解決**: `from ..module import Class` → `from module import Class`
+- **安定性向上**: プロジェクト構造の変更に対する堅牢性向上
+
+### パフォーマンス最適化の実装
+- **Tincture検出**: 複雑なステートマシンから効率的なループに変更
+- **画像認識**: 解像度別テンプレートから単一テンプレート方式
+- **メモリ使用量**: 不要なオブジェクト生成を削減
+- **CPU使用率**: 検出ロジック最適化により更なる軽量化
+
+### コード品質の向上
+- **可読性**: 複雑なコードパスを簡略化
+- **メンテナンス性**: シンプルで理解しやすい構造
+- **エラーハンドリング**: より堅牢な例外処理
+
 ## 今後の開発方針
 
 ### 次期実装予定
-1. **Flask・スキルモジュールの拡張**: Tincture同様の高機能化
-2. **ログ監視機能の強化**: リアルタイム解析機能
-3. **テンプレート画像管理**: 実ゲーム画像での置き換え
-4. **パフォーマンス最適化**: さらなる高速化
+1. **依存関係インストール**: 自動化スクリプトの改善
+2. **テンプレート画像管理**: 実ゲーム画像での置き換え
+3. **実機テスト**: 実際のゲーム環境での動作確認
+4. **ファインチューニング**: 検出精度の最適化
 
 ### 拡張性の考慮
 - **モジュラー設計**: 新機能の追加が容易
 - **設定駆動**: コード変更なしでの動作調整
-- **プラグイン機構**: 将来的な機能拡張に対応
+- **最適化指向**: パフォーマンスとメンテナンス性のバランス
+
+## 技術的な決定事項の更新
+
+### 画像認識戦略
+- **従来**: 複数解像度対応、複数状態検出
+- **現在**: 単一テンプレート、Idle状態特化
+- **理由**: 実用性とパフォーマンスのバランス
+
+### モジュール設計哲学
+- **KISS原則**: Keep It Simple, Stupid
+- **実用性重視**: 過度な複雑性を避け、確実に動作する設計
+- **保守性**: 長期メンテナンスを考慮した構造
