@@ -70,12 +70,6 @@ class AreaSelector:
                 "height": 120,
                 "monitor": 0
             },
-            "tincture_slot_3": {
-                "relative_x": 180,
-                "relative_y": 0,
-                "width": 60,
-                "height": 100
-            },
             "metadata": {
                 "version": "1.0",
                 "description": "POE Macro v3 detection areas configuration"
@@ -125,12 +119,6 @@ class AreaSelector:
                 "width": default_area["width"],
                 "height": default_area["height"],
                 "monitor": 0  # プライマリモニター
-            },
-            "tincture_slot": {
-                "relative_x": 180,  # フラスコエリア内での相対位置
-                "relative_y": 0,
-                "width": 60,
-                "height": 100
             },
             "presets": self.presets
         }
@@ -344,44 +332,8 @@ class AreaSelector:
         else:
             self.logger.error(f"[SET] 設定ファイル保存失敗: X={x}, Y={y}, W={width}, H={height}")
         
-    def get_tincture_slot(self) -> Dict:
-        """Tinctureスロットの座標を取得"""
-        return self.config_data.get("tincture_slot", {
-            "relative_x": 180,
-            "relative_y": 0,
-            "width": 60,
-            "height": 100
-        })
         
-    def set_tincture_slot(self, relative_x: int, relative_y: int, width: int, height: int):
-        """Tinctureスロットの相対座標を設定"""
-        if "tincture_slot" not in self.config_data:
-            self.config_data["tincture_slot"] = {}
-            
-        self.config_data["tincture_slot"].update({
-            "relative_x": relative_x,
-            "relative_y": relative_y,
-            "width": width,
-            "height": height
-        })
         
-        self.save_config()
-        self.logger.info(f"Tinctureスロットを設定しました: ({relative_x}, {relative_y}, {width}, {height})")
-        
-    def get_absolute_tincture_area(self) -> Dict:
-        """Tinctureの絶対座標を計算して取得（3番スロットのみ）"""
-        flask_area = self.get_flask_area()
-        tincture_slot = self.get_tincture_slot()
-        
-        absolute_x = flask_area["x"] + tincture_slot["relative_x"]
-        absolute_y = flask_area["y"] + tincture_slot["relative_y"]
-        
-        return {
-            "x": absolute_x,
-            "y": absolute_y,
-            "width": tincture_slot["width"],
-            "height": tincture_slot["height"]
-        }
     
     def get_full_flask_area_for_tincture(self) -> Dict:
         """フラスコエリア全体をTincture検出エリアとして取得"""
@@ -576,7 +528,8 @@ class AreaSelector:
     def get_config_summary(self) -> Dict:
         """設定の概要を取得"""
         flask_area = self.get_flask_area()
-        tincture_area = self.get_absolute_tincture_area()
+        # Tincture area is now the full flask area
+        tincture_area = self.get_full_flask_area_for_tincture()
         current_resolution = self.get_current_resolution()
         
         return {

@@ -635,11 +635,11 @@ class MainWindow(QMainWindow):
                 self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
                 self.log_message(f"フラスコ全体Tincture検出エリア: ({full_area['x']}, {full_area['y']}, {full_area['width']}, {full_area['height']})")
             else:
-                # 自動モード：3番スロットのみ
-                tincture_area = self.area_selector.get_absolute_tincture_area()
-                self.test_result_label.setText(f"テスト結果: 自動検出モード - 3番スロットのみ")
+                # フラスコエリア全体を使用（デフォルトモード）
+                tincture_area = self.area_selector.get_full_flask_area_for_tincture()
+                self.test_result_label.setText(f"テスト結果: フラスコエリア全体検出モード")
                 self.log_message(f"検出テスト実行 - フラスコエリア: ({area['x']}, {area['y']}, {area['width']}, {area['height']})")
-                self.log_message(f"自動Tincture検出エリア（3番スロット）: ({tincture_area['x']}, {tincture_area['y']}, {tincture_area['width']}, {tincture_area['height']})")
+                self.log_message(f"Tincture検出エリア（フラスコ全体）: ({tincture_area['x']}, {tincture_area['y']}, {tincture_area['width']}, {tincture_area['height']})")
             
         except Exception as e:
             self.test_result_label.setText(f"テスト結果: エラー - {e}")

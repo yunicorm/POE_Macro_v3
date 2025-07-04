@@ -67,7 +67,8 @@ def test_area_selector():
             
         # 3番スロット自動計算エリアを取得
         try:
-            slot_area = area_selector.get_absolute_tincture_area()
+            # Slot 3 functionality removed - using full flask area instead
+            slot_area = area_selector.get_full_flask_area_for_tincture()
             print(f"🎲 3番スロット自動計算: X={slot_area['x']}, Y={slot_area['y']}, W={slot_area['width']}, H={slot_area['height']}")
         except Exception as e:
             print(f"❌ 3番スロット計算エラー: {e}")

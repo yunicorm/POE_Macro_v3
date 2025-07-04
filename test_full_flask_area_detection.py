@@ -65,20 +65,9 @@ def test_full_flask_area_mode():
             def get_flask_area(self):
                 return self.flask_area
             
-            def get_tincture_slot(self):
-                return self.tincture_slot
+            # get_tincture_slot method removed - slot 3 functionality deprecated
             
-            def get_absolute_tincture_area(self):
-                """従来の3番スロット計算（狭い範囲）"""
-                absolute_x = self.flask_area["x"] + self.tincture_slot["relative_x"]
-                absolute_y = self.flask_area["y"] + self.tincture_slot["relative_y"]
-                
-                return {
-                    "x": absolute_x,
-                    "y": absolute_y,
-                    "width": self.tincture_slot["width"],
-                    "height": self.tincture_slot["height"]
-                }
+            # get_absolute_tincture_area method removed - slot 3 functionality deprecated
             
             def get_full_flask_area_for_tincture(self):
                 """新機能：フラスコエリア全体（広い範囲）"""
@@ -117,7 +106,8 @@ def test_full_flask_area_mode():
         print("5. 検出エリアの比較テスト...")
         
         # 従来の3番スロット検出エリア
-        slot3_area = area_selector.get_absolute_tincture_area()
+        # Slot 3 functionality removed - using full flask area instead
+        slot3_area = area_selector.get_full_flask_area_for_tincture()
         print(f"   従来の3番スロット検出エリア: X:{slot3_area['x']}, Y:{slot3_area['y']}, W:{slot3_area['width']}, H:{slot3_area['height']}")
         
         # 新しいフラスコエリア全体検出エリア
@@ -151,7 +141,8 @@ def test_full_flask_area_mode():
                 return capture_area, "フラスコエリア全体"
             elif area_selector:
                 # 従来の3番スロット方法
-                tincture_area = area_selector.get_absolute_tincture_area()
+                # Slot 3 functionality removed - using full flask area instead
+                tincture_area = area_selector.get_full_flask_area_for_tincture()
                 capture_area = {
                     'top': tincture_area['y'],
                     'left': tincture_area['x'],

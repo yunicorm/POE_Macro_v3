@@ -46,7 +46,8 @@ def test_detection_area_update():
         # 4. 初期設定の確認
         print("4. 初期設定の確認...")
         if tincture_module.area_selector:
-            current_area = tincture_module.area_selector.get_absolute_tincture_area()
+            # Slot 3 functionality removed - using full flask area instead
+            current_area = tincture_module.area_selector.get_full_flask_area_for_tincture()
             print(f"   初期検出エリア: X:{current_area['x']}, Y:{current_area['y']}, W:{current_area['width']}, H:{current_area['height']}")
         else:
             print("   AreaSelectorが設定されていません")
@@ -71,7 +72,8 @@ def test_detection_area_update():
         # 7. 変更後の設定確認
         print("7. 変更後の設定確認...")
         if tincture_module.area_selector:
-            updated_area = tincture_module.area_selector.get_absolute_tincture_area()
+            # Slot 3 functionality removed - using full flask area instead
+            updated_area = tincture_module.area_selector.get_full_flask_area_for_tincture()
             print(f"   更新後検出エリア: X:{updated_area['x']}, Y:{updated_area['y']}, W:{updated_area['width']}, H:{updated_area['height']}")
             
             # 8. 変更の確認
@@ -155,7 +157,8 @@ def test_gui_integration():
             print("   ✓ TinctureModule更新完了")
             
             # 設定確認
-            updated_area = macro_controller.tincture_module.area_selector.get_absolute_tincture_area()
+            # Slot 3 functionality removed - using full flask area instead
+            updated_area = macro_controller.tincture_module.area_selector.get_full_flask_area_for_tincture()
             print(f"   更新後検出エリア: X:{updated_area['x']}, Y:{updated_area['y']}, W:{updated_area['width']}, H:{updated_area['height']}")
             
             return True

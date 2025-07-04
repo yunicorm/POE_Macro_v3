@@ -88,9 +88,6 @@ class TinctureDetector:
                 if self.detection_mode == 'full_flask_area':
                     area_info = self.area_selector.get_full_flask_area_for_tincture()
                     logger.info(f"[INIT] フラスコエリア全体検出: X={area_info['x']}, Y={area_info['y']}, W={area_info['width']}, H={area_info['height']}")
-                elif self.detection_mode == 'auto_slot3':
-                    area_info = self.area_selector.get_absolute_tincture_area()
-                    logger.info(f"[INIT] 3番スロット自動計算: X={area_info['x']}, Y={area_info['y']}, W={area_info['width']}, H={area_info['height']}")
             except Exception as e:
                 logger.warning(f"[INIT] 検出エリア情報の取得に失敗: {e}")
         
@@ -148,7 +145,8 @@ class TinctureDetector:
             elif self.area_selector:
                 # AreaSelectorから検出エリアを取得（従来の3番スロット方法）
                 try:
-                    tincture_area = self.area_selector.get_absolute_tincture_area()
+                    # Legacy mode removed - fallback to full flask area
+                    tincture_area = self.area_selector.get_full_flask_area_for_tincture()
                     capture_area = {
                         'top': tincture_area['y'],
                         'left': tincture_area['x'],
@@ -233,7 +231,8 @@ class TinctureDetector:
             # 現在の検出エリア設定を出力
             if self.area_selector:
                 try:
-                    tincture_area = self.area_selector.get_absolute_tincture_area()
+                    # Legacy mode removed - fallback to full flask area
+                    tincture_area = self.area_selector.get_full_flask_area_for_tincture()
                     logger.debug(f"Current detection area: X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
                 except Exception as e:
                     logger.warning(f"Failed to get current detection area: {e}")
@@ -289,7 +288,8 @@ class TinctureDetector:
             if self.area_selector:
                 try:
                     flask_area = self.area_selector.get_flask_area()
-                    tincture_area = self.area_selector.get_absolute_tincture_area()
+                    # Legacy mode removed - fallback to full flask area
+                    tincture_area = self.area_selector.get_full_flask_area_for_tincture()
                     
                     info.update({
                         'flask_area': flask_area,

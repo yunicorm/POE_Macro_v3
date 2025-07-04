@@ -15,7 +15,6 @@ metadata:
 
     - flask_area: フラスコバー全体の検出エリア
 
-    - tincture_slot: Tinctureスロット（通常は3番）の相対位置
 
     - presets: 解像度別の推奨設定
 
@@ -26,7 +25,6 @@ metadata:
 
     - マルチモニター環境では monitor インデックスで対象モニターを指定
 
-    - tincture_slot の座標は flask_area 内での相対座標
 
 
     カスタマイズ方法:
@@ -63,8 +61,3 @@ presets:
     width: 800
     x: 490
     y: 1700
-tincture_slot:
-  height: 100
-  relative_x: 180
-  relative_y: 0
-  width: 60

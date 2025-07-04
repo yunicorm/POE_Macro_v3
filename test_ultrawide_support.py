@@ -62,7 +62,8 @@ def test_area_selector():
         print(f"  X={flask_area['x']}, Y={flask_area['y']}, W={flask_area['width']}, H={flask_area['height']}")
         
         # Tinctureの絶対座標を計算
-        tincture_area = selector.get_absolute_tincture_area()
+        # Slot 3 functionality removed - using full flask area instead
+        tincture_area = selector.get_full_flask_area_for_tincture()
         print(f"\nTincture絶対座標:")
         print(f"  X={tincture_area['x']}, Y={tincture_area['y']}, W={tincture_area['width']}, H={tincture_area['height']}")
         
@@ -147,7 +148,8 @@ def test_tincture_detection():
         # 検出エリア情報を表示
         from src.features.area_selector import AreaSelector
         area_selector = AreaSelector()
-        tincture_area = area_selector.get_absolute_tincture_area()
+        # Slot 3 functionality removed - using full flask area instead
+        tincture_area = area_selector.get_full_flask_area_for_tincture()
         print(f"  検出エリア: X={tincture_area['x']}, Y={tincture_area['y']}, W={tincture_area['width']}, H={tincture_area['height']}")
         
         # 単発検出テスト（実際のスクリーンショットは取らない）
