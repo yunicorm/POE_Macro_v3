@@ -90,7 +90,7 @@ class MacroController:
         self.running = False
         self.emergency_stop = False
         self.waiting_for_input = False  # Grace Period待機状態
-        self.grace_period_enabled = config.get('grace_period', {}).get('enabled', True)
+        self.grace_period_enabled = self.config.get('grace_period', {}).get('enabled', True)
         
         # グローバルホットキーリスナー
         self.hotkey_listener = None
