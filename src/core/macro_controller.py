@@ -52,10 +52,13 @@ class MacroController:
             tincture_config = {'enabled': False}
         logger.debug(f"Tincture config for init: {tincture_config}")
         
-        # モジュールの初期化（エラー処理付き）
+        # ウィンドウマネージャー
+        self.window_manager = WindowManager()
+        
+        # モジュールの初期化（エラー処理付き、window_manager付き）
         try:
             logger.debug("Initializing FlaskModule...")
-            self.flask_module = FlaskModule(flask_config)
+            self.flask_module = FlaskModule(flask_config, self.window_manager)
             logger.debug("FlaskModule initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize FlaskModule: {e}")
@@ -65,7 +68,7 @@ class MacroController:
         
         try:
             logger.debug("Initializing SkillModule...")
-            self.skill_module = SkillModule(skills_config)
+            self.skill_module = SkillModule(skills_config, self.window_manager)
             logger.debug("SkillModule initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize SkillModule: {e}")
@@ -75,7 +78,7 @@ class MacroController:
         
         try:
             logger.debug("Initializing TinctureModule...")
-            self.tincture_module = TinctureModule(tincture_config)
+            self.tincture_module = TinctureModule(tincture_config, self.window_manager)
             logger.debug("TinctureModule initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize TinctureModule: {e}")
@@ -89,9 +92,6 @@ class MacroController:
         
         # グローバルホットキーリスナー
         self.hotkey_listener = None
-        
-        # ウィンドウマネージャー
-        self.window_manager = WindowManager()
         
         logger.info("MacroController initialized successfully")
         

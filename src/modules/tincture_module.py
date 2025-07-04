@@ -18,12 +18,13 @@ logger = logging.getLogger(__name__)
 class TinctureModule:
     """Tincture自動使用モジュール"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], window_manager=None):
         """
         TinctureModule の初期化
         
         Args:
             config: 設定辞書
+            window_manager: ウィンドウマネージャー
         """
         # 設定の型チェック
         if not isinstance(config, dict):
@@ -34,6 +35,7 @@ class TinctureModule:
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.last_use_time = 0
+        self.window_manager = window_manager
         
         # 設定の読み込み
         self.enabled = config.get('enabled', True)
@@ -144,16 +146,17 @@ class TinctureModule:
                     
                     if time_since_last_use >= self.min_use_interval:
                         logger.info(f"Tincture IDLE detected! Using tincture (key: {self.key})")
-                        self.keyboard.press_key(self.key)
+                        success = self._use_tincture()
                         
-                        # 統計を更新
-                        self.last_use_time = current_time
-                        self.stats['total_uses'] += 1
-                        self.stats['successful_detections'] += 1
-                        self.stats['idle_detections'] += 1
-                        self.stats['last_use_timestamp'] = current_time
-                        
-                        logger.info(f"Tincture used successfully. Total uses: {self.stats['total_uses']}")
+                        if success:
+                            # 統計を更新
+                            self.last_use_time = current_time
+                            self.stats['total_uses'] += 1
+                            self.stats['successful_detections'] += 1
+                            self.stats['idle_detections'] += 1
+                            self.stats['last_use_timestamp'] = current_time
+                            
+                            logger.info(f"Tincture used successfully. Total uses: {self.stats['total_uses']}")
                         
                         # 使用後は少し長めに待機（Active状態になるまで）
                         logger.debug("Waiting 2 seconds for tincture to become active...")
@@ -291,14 +294,15 @@ class TinctureModule:
             
             # キーを入力
             logger.info(f"Manual tincture use (key: {self.key})")
-            self.keyboard.press_key(self.key)
+            success = self._use_tincture()
             
-            # 使用時刻と統計の更新
-            self.last_use_time = current_time
-            self.stats['total_uses'] += 1
-            self.stats['last_use_timestamp'] = current_time
+            if success:
+                # 使用時刻と統計の更新
+                self.last_use_time = current_time
+                self.stats['total_uses'] += 1
+                self.stats['last_use_timestamp'] = current_time
             
-            return True
+            return success
             
         except Exception as e:
             logger.error(f"Failed to use tincture manually: {e}")
@@ -326,6 +330,32 @@ class TinctureModule:
         except Exception as e:
             logger.warning(f"Failed to load default sensitivity from config: {e}")
             return 0.7  # フォールバック値
+    
+    def _use_tincture(self) -> bool:
+        """Tinctureを使用（POEウィンドウアクティブチェック付き）"""
+        # Path of Exileがアクティブでない場合はスキップ
+        if hasattr(self, 'window_manager') and self.window_manager:
+            try:
+                if not self.window_manager.is_poe_active():
+                    logger.debug("Path of Exile is not active, skipping tincture use")
+                    return False
+            except Exception as e:
+                logger.debug(f"Error checking POE window status: {e}")
+                # エラーが発生してもキー入力を継続
+        
+        # POEがアクティブの場合のみキー入力を実行
+        try:
+            self.keyboard.press_key(self.key)
+            logger.debug(f"Tincture used (key: {self.key})")
+            return True
+        except Exception as e:
+            logger.error(f"Error using tincture: {e}")
+            return False
+    
+    def set_window_manager(self, window_manager):
+        """WindowManagerの参照を設定"""
+        self.window_manager = window_manager
+        logger.debug("TinctureModule: WindowManager reference set")
     
     def __del__(self):
         """デストラクタ：リソースのクリーンアップ"""

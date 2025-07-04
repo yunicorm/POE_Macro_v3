@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class FlaskModule:
     """フラスコ自動使用を制御するクラス"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], window_manager=None):
         # 設定の型チェック
         if not isinstance(config, dict):
             logger.error(f"FlaskModule.__init__ received non-dict config: {type(config)} - {config}")
@@ -24,6 +24,7 @@ class FlaskModule:
         self.keyboard = KeyboardController()
         self.running = False
         self.threads = []
+        self.window_manager = window_manager
         
     def start(self):
         """フラスコ自動使用を開始"""
@@ -57,13 +58,37 @@ class FlaskModule:
         self.threads.clear()
         logger.info("Flask module stopped")
     
+    def _use_flask(self, key: str, slot_name: str):
+        """フラスコを使用（POEウィンドウアクティブチェック付き）"""
+        # Path of Exileがアクティブでない場合はスキップ
+        if hasattr(self, 'window_manager') and self.window_manager:
+            try:
+                if not self.window_manager.is_poe_active():
+                    logger.debug(f"{slot_name}: Path of Exile is not active, skipping flask use")
+                    return
+            except Exception as e:
+                logger.debug(f"{slot_name}: Error checking POE window status: {e}")
+                # エラーが発生してもキー入力を継続
+        
+        # POEがアクティブの場合のみキー入力を実行
+        try:
+            self.keyboard.press_key(key)
+            logger.debug(f"{slot_name}: Flask used (key: {key})")
+        except Exception as e:
+            logger.error(f"{slot_name}: Error using flask: {e}")
+    
+    def set_window_manager(self, window_manager):
+        """WindowManagerの参照を設定"""
+        self.window_manager = window_manager
+        logger.debug("FlaskModule: WindowManager reference set")
+    
     def _flask_loop(self, slot_name: str, config: Dict[str, Any]):
         """個別フラスコのループ処理"""
         key = config['key']
         loop_delay = config['loop_delay']
         
         # 初回使用
-        self.keyboard.press_key(key)
+        self._use_flask(key, slot_name)
         
         while self.running:
             # ランダム遅延
@@ -77,4 +102,4 @@ class FlaskModule:
                 time.sleep(0.1)
             
             if self.running:
-                self.keyboard.press_key(key)
+                self._use_flask(key, slot_name)

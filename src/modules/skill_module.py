@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class SkillModule:
     """スキル自動使用を制御するクラス"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], window_manager=None):
         # 設定の型チェック
         if not isinstance(config, dict):
             logger.error(f"SkillModule.__init__ received non-dict config: {type(config)} - {config}")
@@ -24,6 +24,7 @@ class SkillModule:
         self.keyboard = KeyboardController()
         self.running = False
         self.threads = []
+        self.window_manager = window_manager
         self.stats = {
             'berserk': {'count': 0, 'last_used': None},
             'molten_shell': {'count': 0, 'last_used': None},
@@ -80,10 +81,34 @@ class SkillModule:
         """手動でスキルを使用"""
         if skill_name in self.config:
             key = self.config[skill_name]['key']
+            self._use_skill(key, skill_name)
+            logger.info(f"Manual use of {skill_name}")
+    
+    def _use_skill(self, key: str, skill_name: str):
+        """スキルを使用（POEウィンドウアクティブチェック付き）"""
+        # Path of Exileがアクティブでない場合はスキップ
+        if hasattr(self, 'window_manager') and self.window_manager:
+            try:
+                if not self.window_manager.is_poe_active():
+                    logger.debug(f"{skill_name}: Path of Exile is not active, skipping skill use")
+                    return
+            except Exception as e:
+                logger.debug(f"{skill_name}: Error checking POE window status: {e}")
+                # エラーが発生してもキー入力を継続
+        
+        # POEがアクティブの場合のみキー入力を実行
+        try:
             self.keyboard.press_key(key)
             self.stats[skill_name]['count'] += 1
             self.stats[skill_name]['last_used'] = time.time()
-            logger.info(f"Manual use of {skill_name}")
+            logger.debug(f"{skill_name}: Skill used (key: {key}, count: {self.stats[skill_name]['count']})")
+        except Exception as e:
+            logger.error(f"{skill_name}: Error using skill: {e}")
+    
+    def set_window_manager(self, window_manager):
+        """WindowManagerの参照を設定"""
+        self.window_manager = window_manager
+        logger.debug("SkillModule: WindowManager reference set")
     
     def _skill_loop(self, skill_name: str, config: Dict[str, Any]):
         """個別スキルのループ処理"""
@@ -91,10 +116,7 @@ class SkillModule:
         interval = config['interval']
         
         # 初回使用
-        self.keyboard.press_key(key)
-        self.stats[skill_name]['count'] += 1
-        self.stats[skill_name]['last_used'] = time.time()
-        logger.debug(f"{skill_name}: Initial use")
+        self._use_skill(key, skill_name)
         
         while self.running:
             # ランダム遅延（アンチチート対策）
@@ -108,7 +130,4 @@ class SkillModule:
                 time.sleep(0.1)
             
             if self.running:
-                self.keyboard.press_key(key)
-                self.stats[skill_name]['count'] += 1
-                self.stats[skill_name]['last_used'] = time.time()
-                logger.debug(f"{skill_name}: Used (count: {self.stats[skill_name]['count']})")
+                self._use_skill(key, skill_name)
