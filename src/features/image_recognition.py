@@ -96,8 +96,9 @@ class TinctureDetector:
             if self.detection_mode == 'manual' and self.manual_detection_area:
                 # 手動設定エリアを使用
                 capture_area = self.manual_detection_area.copy()
-                logger.debug(f"Using manual detection area: {capture_area}")
-                logger.debug(f"Manual area details - X:{capture_area['left']}, Y:{capture_area['top']}, W:{capture_area['width']}, H:{capture_area['height']}")
+                logger.info(f"[DETECTION] モード: manual - 手動設定エリア使用")
+                logger.info(f"[DETECTION] エリア座標: X={capture_area['left']}, Y={capture_area['top']}, W={capture_area['width']}, H={capture_area['height']}")
+                logger.debug(f"Manual detection area raw data: {capture_area}")
             elif self.detection_mode == 'full_flask_area' and self.area_selector:
                 # フラスコエリア全体を使用（新しいモード）
                 try:
@@ -108,11 +109,14 @@ class TinctureDetector:
                         'width': full_area['width'],
                         'height': full_area['height']
                     }
-                    logger.debug(f"Using full flask area for tincture detection: {capture_area}")
-                    logger.debug(f"Full flask area details - X:{full_area['x']}, Y:{full_area['y']}, W:{full_area['width']}, H:{full_area['height']}")
+                    logger.info(f"[DETECTION] モード: full_flask_area - フラスコエリア全体使用")
+                    logger.info(f"[DETECTION] エリア座標: X={full_area['x']}, Y={full_area['y']}, W={full_area['width']}, H={full_area['height']}")
+                    logger.info(f"[DETECTION] 検出範囲面積: {full_area['width'] * full_area['height']}px²")
+                    logger.debug(f"Full flask area raw data: {full_area}")
                 except Exception as e:
                     logger.warning(f"Failed to get full flask area, using fallback: {e}")
                     capture_area = self._get_fallback_area()
+                    logger.info(f"[DETECTION] モード: fallback - フォールバックエリア使用")
             elif self.area_selector:
                 # AreaSelectorから検出エリアを取得（従来の3番スロット方法）
                 try:
@@ -123,13 +127,16 @@ class TinctureDetector:
                         'width': tincture_area['width'],
                         'height': tincture_area['height']
                     }
-                    logger.debug(f"Using AreaSelector 3rd slot detection area: {capture_area}")
-                    logger.debug(f"3rd slot area details - X:{tincture_area['x']}, Y:{tincture_area['y']}, W:{tincture_area['width']}, H:{tincture_area['height']}")
+                    logger.info(f"[DETECTION] モード: auto_slot3 - 3番スロット自動計算")
+                    logger.info(f"[DETECTION] エリア座標: X={tincture_area['x']}, Y={tincture_area['y']}, W={tincture_area['width']}, H={tincture_area['height']}")
+                    logger.debug(f"3rd slot area raw data: {tincture_area}")
                 except Exception as e:
                     logger.warning(f"Failed to get configured area, using fallback: {e}")
                     capture_area = self._get_fallback_area()
+                    logger.info(f"[DETECTION] モード: fallback - フォールバックエリア使用")
             else:
                 capture_area = self._get_fallback_area()
+                logger.info(f"[DETECTION] モード: fallback - AreaSelector未設定")
             
             # スクリーンショットを撮影（新しいmssインスタンスを使用）
             with mss.mss() as sct:
@@ -156,6 +163,7 @@ class TinctureDetector:
                 monitor_index = self.MONITOR_CONFIGS[self.monitor_config]
                 if monitor_index >= len(sct.monitors) - 1:
                     monitor_index = 0  # プライマリモニターにフォールバック
+                    logger.warning(f"指定されたモニター({self.monitor_config})が見つかりません。プライマリモニターを使用します")
                 
                 monitor = sct.monitors[monitor_index + 1]  # monitors[0]は全画面
                 
@@ -164,22 +172,30 @@ class TinctureDetector:
                 height = monitor['height']
                 
                 # 右上の約1/4エリアをキャプチャ（従来の方式）
-                return {
+                fallback_area = {
                     'top': monitor['top'],
                     'left': monitor['left'] + width // 2,
                     'width': width // 2,
                     'height': height // 4
                 }
+                
+                logger.info(f"[FALLBACK] モニター解像度: {width}x{height}")
+                logger.info(f"[FALLBACK] エリア座標: X={fallback_area['left']}, Y={fallback_area['top']}, W={fallback_area['width']}, H={fallback_area['height']}")
+                logger.info(f"[FALLBACK] 検出範囲面積: {fallback_area['width'] * fallback_area['height']}px²")
+                
+                return fallback_area
             
         except Exception as e:
             logger.error(f"Failed to get fallback area: {e}")
             # 最後の手段として固定値を返す
-            return {
+            emergency_area = {
                 'top': 0,
                 'left': 960,  # 1920x1080の右半分
                 'width': 960,
                 'height': 270
             }
+            logger.warning(f"[EMERGENCY] 緊急フォールバック: X={emergency_area['left']}, Y={emergency_area['top']}, W={emergency_area['width']}, H={emergency_area['height']}")
+            return emergency_area
     
     def detect_tincture_icon(self) -> bool:
         """Tincture Idle状態を検出"""

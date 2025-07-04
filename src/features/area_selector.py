@@ -61,25 +61,56 @@ class AreaSelector:
             }
         }
         
+        # デフォルト設定を定義（フォールバック用）
+        self.default_config = {
+            "flask_area": {
+                "x": 245,
+                "y": 850,
+                "width": 400,
+                "height": 120,
+                "monitor": 0
+            },
+            "tincture_slot_3": {
+                "relative_x": 180,
+                "relative_y": 0,
+                "width": 60,
+                "height": 100
+            },
+            "metadata": {
+                "version": "1.0",
+                "description": "POE Macro v3 detection areas configuration"
+            }
+        }
+        
         # 初期化
         self.load_config()
         
     def load_config(self) -> bool:
-        """設定ファイルから座標データを読み込み"""
+        """設定ファイルから座標データを読み込み（フォールバック機能付き）"""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
-                    self.config_data = yaml.safe_load(f) or {}
-                self.logger.info(f"設定ファイルを読み込みました: {self.config_file}")
-                return True
+                    loaded_data = yaml.safe_load(f) or {}
+                
+                # 読み込んだデータの検証
+                if self._validate_config_data(loaded_data):
+                    self.config_data = loaded_data
+                    self.logger.info(f"設定ファイルを読み込みました: {self.config_file}")
+                    return True
+                else:
+                    self.logger.warning("設定ファイルが無効です。デフォルト設定で初期化します")
+                    self._apply_default_config()
+                    return False
             else:
-                # デフォルト設定で新規作成
+                # 設定ファイルが存在しない場合：デフォルト設定で新規作成
+                self.logger.info("設定ファイルが存在しません。デフォルト設定で作成します")
                 self.create_default_config()
                 return True
                 
         except Exception as e:
             self.logger.error(f"設定ファイルの読み込みに失敗しました: {e}")
-            self.create_default_config()
+            self.logger.info("デフォルト設定を適用しています...")
+            self._apply_default_config()
             return False
             
     def create_default_config(self):
@@ -106,6 +137,78 @@ class AreaSelector:
         
         self.save_config()
         self.logger.info("デフォルト設定を作成しました")
+    
+    def _validate_config_data(self, data: dict) -> bool:
+        """設定データの妥当性を検証"""
+        try:
+            if not isinstance(data, dict):
+                self.logger.warning("設定データが辞書型ではありません")
+                return False
+            
+            # flask_areaの存在と構造確認
+            flask_area = data.get('flask_area', {})
+            if not isinstance(flask_area, dict):
+                self.logger.warning("flask_area設定が辞書型ではありません")
+                return False
+                
+            # 必須フィールドの存在確認
+            required_fields = ['x', 'y', 'width', 'height']
+            for field in required_fields:
+                if field not in flask_area:
+                    self.logger.warning(f"flask_area.{field}が設定されていません")
+                    return False
+                    
+                # 数値型の確認
+                if not isinstance(flask_area[field], (int, float)):
+                    self.logger.warning(f"flask_area.{field}が数値型ではありません: {type(flask_area[field])}")
+                    return False
+                    
+                # 範囲確認（負の値は無効）
+                if flask_area[field] < 0:
+                    self.logger.warning(f"flask_area.{field}が負の値です: {flask_area[field]}")
+                    return False
+            
+            # 座標の妥当性確認（画面外座標の検出）
+            if flask_area['width'] <= 0 or flask_area['height'] <= 0:
+                self.logger.warning(f"flask_area のサイズが無効です: width={flask_area['width']}, height={flask_area['height']}")
+                return False
+                
+            # 極端に大きい値の検出（10000pxを超える座標は怪しい）
+            max_reasonable_value = 10000
+            for field in required_fields:
+                if flask_area[field] > max_reasonable_value:
+                    self.logger.warning(f"flask_area.{field}が異常に大きい値です: {flask_area[field]}")
+                    return False
+            
+            self.logger.debug("設定データの検証が完了しました")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"設定データの検証中にエラーが発生しました: {e}")
+            return False
+    
+    def _apply_default_config(self):
+        """デフォルト設定を適用（ファイル保存なし）"""
+        try:
+            # 現在解像度に基づくプリセットを取得
+            current_resolution = self.get_current_resolution()
+            preset = self.get_preset_for_resolution(current_resolution)
+            
+            # デフォルト設定にプリセット値を反映
+            self.config_data = self.default_config.copy()
+            self.config_data["flask_area"].update({
+                "x": preset["x"],
+                "y": preset["y"], 
+                "width": preset["width"],
+                "height": preset["height"]
+            })
+            
+            self.logger.info(f"デフォルト設定を適用しました（解像度: {current_resolution}）")
+            
+        except Exception as e:
+            self.logger.error(f"デフォルト設定の適用に失敗しました: {e}")
+            # 最終フォールバック
+            self.config_data = self.default_config.copy()
         
     def save_config(self) -> bool:
         """設定をファイルに保存"""
@@ -150,14 +253,59 @@ class AreaSelector:
         return self.presets.copy()
         
     def get_flask_area(self) -> Dict:
-        """フラスコエリアの座標を取得"""
-        return self.config_data.get("flask_area", {
-            "x": 245,
-            "y": 850,
-            "width": 400,
-            "height": 120,
-            "monitor": 0
-        })
+        """フラスコエリアの座標を取得（フォールバック機能付き）"""
+        try:
+            flask_area = self.config_data.get("flask_area", {})
+            
+            # 設定データが空または不正な場合のフォールバック
+            if not flask_area or not self._validate_flask_area_data(flask_area):
+                self.logger.warning("フラスコエリア設定が無効です。デフォルト値を使用します")
+                current_resolution = self.get_current_resolution()
+                preset = self.get_preset_for_resolution(current_resolution)
+                return {
+                    "x": preset["x"],
+                    "y": preset["y"],
+                    "width": preset["width"],
+                    "height": preset["height"],
+                    "monitor": 0
+                }
+            
+            return flask_area
+            
+        except Exception as e:
+            self.logger.error(f"フラスコエリア取得中にエラーが発生しました: {e}")
+            # 最終フォールバック
+            return {
+                "x": 245,
+                "y": 850,
+                "width": 400,
+                "height": 120,
+                "monitor": 0
+            }
+    
+    def _validate_flask_area_data(self, flask_area: dict) -> bool:
+        """フラスコエリアデータの妥当性を検証"""
+        try:
+            if not isinstance(flask_area, dict):
+                return False
+                
+            required_fields = ['x', 'y', 'width', 'height']
+            for field in required_fields:
+                if field not in flask_area:
+                    return False
+                if not isinstance(flask_area[field], (int, float)):
+                    return False
+                if flask_area[field] < 0:
+                    return False
+                    
+            # サイズの妥当性
+            if flask_area['width'] <= 0 or flask_area['height'] <= 0:
+                return False
+                
+            return True
+            
+        except Exception:
+            return False
         
     def set_flask_area(self, x: int, y: int, width: int, height: int, monitor: int = 0):
         """フラスコエリアの座標を設定"""
