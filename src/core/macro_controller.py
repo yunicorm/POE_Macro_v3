@@ -10,6 +10,7 @@ from modules.flask_module import FlaskModule
 from modules.skill_module import SkillModule
 from modules.tincture_module import TinctureModule
 from core.config_manager import ConfigManager
+from utils.window_manager import WindowManager
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,9 @@ class MacroController:
         # グローバルホットキーリスナー
         self.hotkey_listener = None
         
+        # ウィンドウマネージャー
+        self.window_manager = WindowManager()
+        
         logger.info("MacroController initialized successfully")
         
     def start(self):
@@ -123,6 +127,22 @@ class MacroController:
             
             self.running = True
             self.emergency_stop = False
+            
+            # Path of Exileウィンドウをアクティブにする
+            logger.info("Attempting to activate Path of Exile window...")
+            try:
+                activation_success = self.window_manager.activate_poe_window(timeout=3.0)
+                if activation_success:
+                    logger.info("Successfully activated Path of Exile window")
+                    # ウィンドウ切り替え後の安定化のため少し待機
+                    import time
+                    time.sleep(0.5)
+                else:
+                    logger.warning("Failed to activate Path of Exile window - macro will start anyway")
+                    logger.warning("Please manually focus on Path of Exile window for optimal performance")
+            except Exception as e:
+                logger.error(f"Error during window activation: {e}")
+                logger.warning("Continuing with macro startup despite window activation failure")
             
             # 各モジュールの開始
             logger.info("Starting macro modules...")
@@ -354,6 +374,35 @@ class MacroController:
     def manual_tincture_use(self):
         """手動でTinctureを使用"""
         self.tincture_module.manual_use()
+    
+    def check_poe_window_status(self) -> dict:
+        """Path of Exileウィンドウの状態をチェック"""
+        try:
+            is_process_running = self.window_manager.find_poe_process() is not None
+            is_window_active = self.window_manager.is_poe_active()
+            window_info = self.window_manager.get_poe_window_info()
+            
+            return {
+                'process_running': is_process_running,
+                'window_active': is_window_active,
+                'window_info': window_info
+            }
+        except Exception as e:
+            logger.error(f"Error checking POE window status: {e}")
+            return {
+                'process_running': False,
+                'window_active': False,
+                'window_info': None,
+                'error': str(e)
+            }
+    
+    def activate_poe_window(self) -> bool:
+        """手動でPath of Exileウィンドウをアクティブにする"""
+        try:
+            return self.window_manager.activate_poe_window()
+        except Exception as e:
+            logger.error(f"Error activating POE window: {e}")
+            return False
     
     def __enter__(self):
         """コンテキストマネージャーとして使用"""
