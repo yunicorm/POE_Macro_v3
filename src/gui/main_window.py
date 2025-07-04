@@ -406,6 +406,11 @@ class MainWindow(QMainWindow):
                 # フラスコエリア全体検出モードに設定
                 self.config['tincture']['detection_mode'] = 'full_flask_area'
                 self.config['tincture']['detection_area'] = new_area
+                
+                # 感度設定も保存
+                sensitivity_value = self.sensitivity_slider.value() / 100.0  # スライダーは0-100、設定は0.0-1.0
+                self.config['tincture']['sensitivity'] = sensitivity_value
+                
                 self.config_manager.save_config(self.config)
                 
                 # MacroControllerのTinctureモジュールに変更を伝播
@@ -427,9 +432,15 @@ class MainWindow(QMainWindow):
                 if tincture_module:
                     # 既存のDetectorの設定を更新
                     detector = tincture_module.detector
-                    if detector and hasattr(detector, 'set_detection_mode'):
-                        detector.set_detection_mode('full_flask_area')
-                        self.log_message("TinctureDetector検出モードを更新しました")
+                    if detector:
+                        if hasattr(detector, 'set_detection_mode'):
+                            detector.set_detection_mode('full_flask_area')
+                            self.log_message("TinctureDetector検出モードを更新しました")
+                        
+                        # 感度設定更新
+                        sensitivity_value = self.sensitivity_slider.value() / 100.0
+                        detector.sensitivity = sensitivity_value
+                        self.log_message(f"TinctureDetector感度を更新しました: {sensitivity_value:.2f}")
                     
                     # AreaSelectorも更新
                     if hasattr(tincture_module, 'update_detection_area'):
@@ -462,9 +473,12 @@ class MainWindow(QMainWindow):
                     # TinctureDetectorを再作成
                     from src.features.image_recognition import TinctureDetector
                     
+                    # 設定ファイルから感度のデフォルト値を取得
+                    default_sensitivity = self.config.get('tincture', {}).get('sensitivity', 0.7)
+                    
                     new_detector = TinctureDetector(
                         monitor_config=tincture_config.get('monitor_config', 'Primary'),
-                        sensitivity=tincture_config.get('sensitivity', 0.7),
+                        sensitivity=tincture_config.get('sensitivity', default_sensitivity),
                         area_selector=self.area_selector,
                         config=self.config
                     )
@@ -593,6 +607,11 @@ class MainWindow(QMainWindow):
             # フラスコエリア全体検出モードに設定
             self.config['tincture']['detection_mode'] = 'full_flask_area'
             self.config['tincture']['detection_area'] = new_area
+            
+            # 感度設定も保存
+            sensitivity_value = self.sensitivity_slider.value() / 100.0  # スライダーは0-100、設定は0.0-1.0
+            self.config['tincture']['sensitivity'] = sensitivity_value
+            
             self.config_manager.save_config(self.config)
             
             # MacroControllerのTinctureモジュールに変更を伝播
@@ -600,9 +619,15 @@ class MainWindow(QMainWindow):
                 if self.macro_controller.tincture_module:
                     # TinctureDetectorのフラスコエリア全体検出モードに切り替え
                     detector = self.macro_controller.tincture_module.detector
-                    if detector and hasattr(detector, 'set_detection_mode'):
-                        detector.set_detection_mode('full_flask_area')
-                        self.log_message("フラスコエリア全体検出モードに設定しました")
+                    if detector:
+                        # 検出モード変更
+                        if hasattr(detector, 'set_detection_mode'):
+                            detector.set_detection_mode('full_flask_area')
+                            self.log_message("フラスコエリア全体検出モードに設定しました")
+                        
+                        # 感度設定更新
+                        detector.sensitivity = sensitivity_value
+                        self.log_message(f"Tincture感度を更新しました: {sensitivity_value:.2f}")
                     else:
                         # フォールバック: AreaSelectorを更新
                         if hasattr(self.macro_controller.tincture_module, 'update_detection_area'):

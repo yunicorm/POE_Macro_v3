@@ -21,7 +21,7 @@ class TinctureDetector:
         "Right": 2
     }
     
-    def __init__(self, monitor_config: str = "Primary", sensitivity: float = 0.7, area_selector=None, config=None):
+    def __init__(self, monitor_config: str = "Primary", sensitivity: float = None, area_selector=None, config=None):
         """
         TinctureDetector の初期化
         
@@ -32,9 +32,16 @@ class TinctureDetector:
             config: 設定辞書（検出モード設定含む）
         """
         self.monitor_config = monitor_config
-        self.sensitivity = max(0.5, min(1.0, sensitivity))
         self.area_selector = area_selector
         self.config = config or {}
+        
+        # 感度の設定（設定ファイルから取得またはデフォルト値）
+        if sensitivity is None:
+            # 設定ファイルから感度を取得
+            default_sensitivity = self._get_default_sensitivity()
+            self.sensitivity = max(0.5, min(1.0, default_sensitivity))
+        else:
+            self.sensitivity = max(0.5, min(1.0, sensitivity))
         
         # 検出モードの設定（詳細ログ付き）
         tincture_config = self.config.get('tincture', {})
@@ -136,7 +143,7 @@ class TinctureDetector:
                     }
                     logger.info(f"[DETECTION] モード: full_flask_area - フラスコエリア全体使用")
                     logger.info(f"[DETECTION] エリア座標: X={full_area['x']}, Y={full_area['y']}, W={full_area['width']}, H={full_area['height']}")
-                    logger.info(f"[DETECTION] 検出範囲面積: {full_area['width'] * full_area['height']}px²")
+                    logger.info(f"[DETECTION] 検出範囲面積: {full_area['width'] * full_area['height']}px^2")
                     logger.debug(f"Full flask area raw data: {full_area}")
                 except Exception as e:
                     logger.warning(f"Failed to get full flask area, using fallback: {e}")
@@ -207,7 +214,7 @@ class TinctureDetector:
                 
                 logger.info(f"[FALLBACK] モニター解像度: {width}x{height}")
                 logger.info(f"[FALLBACK] エリア座標: X={fallback_area['left']}, Y={fallback_area['top']}, W={fallback_area['width']}, H={fallback_area['height']}")
-                logger.info(f"[FALLBACK] 検出範囲面積: {fallback_area['width'] * fallback_area['height']}px²")
+                logger.info(f"[FALLBACK] 検出範囲面積: {fallback_area['width'] * fallback_area['height']}px^2")
                 
                 return fallback_area
             
@@ -252,6 +259,7 @@ class TinctureDetector:
             logger.debug(f"Screen captured, shape: {screen.shape}")
             
             # テンプレートマッチング
+            logger.debug(f"Current sensitivity setting: {self.sensitivity}")
             logger.debug(f"Running template matching with sensitivity: {self.sensitivity}")
             result = cv2.matchTemplate(screen, self.template, cv2.TM_CCOEFF_NORMED)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
@@ -260,6 +268,8 @@ class TinctureDetector:
             
             # 検出判定
             detected = max_val >= self.sensitivity
+            comparison_symbol = '>=' if detected else '<'
+            logger.debug(f"Tincture {'detected' if detected else 'NOT detected'} (confidence: {max_val:.3f} {comparison_symbol} {self.sensitivity})")
             
             if detected:
                 logger.info(f"Tincture IDLE detected! (confidence: {max_val:.3f} >= {self.sensitivity})")
@@ -356,3 +366,25 @@ class TinctureDetector:
         """テンプレートを再読み込み"""
         self._load_template()
         logger.info("Template reloaded")
+    
+    def update_sensitivity(self, new_sensitivity: float):
+        """感度を動的に更新"""
+        old_sensitivity = self.sensitivity
+        self.sensitivity = max(0.5, min(1.0, new_sensitivity))
+        logger.info(f"TinctureDetector sensitivity updated: {old_sensitivity:.3f} -> {self.sensitivity:.3f}")
+        
+        # 設定辞書も更新（存在する場合）
+        if self.config and 'tincture' in self.config:
+            self.config['tincture']['sensitivity'] = self.sensitivity
+            logger.debug("Config dictionary updated with new sensitivity")
+    
+    def _get_default_sensitivity(self) -> float:
+        """設定ファイルからデフォルト感度を取得"""
+        try:
+            from src.core.config_manager import ConfigManager
+            config_manager = ConfigManager()
+            default_config = config_manager.load_config()
+            return default_config.get('tincture', {}).get('sensitivity', 0.7)
+        except Exception as e:
+            logger.warning(f"Failed to load default sensitivity from config: {e}")
+            return 0.7  # フォールバック値

@@ -39,7 +39,9 @@ class TinctureModule:
         self.enabled = config.get('enabled', True)
         self.key = config.get('key', '3')
         self.monitor_config = config.get('monitor_config', 'Primary')
-        self.sensitivity = config.get('sensitivity', 0.7)
+        # 設定ファイルからデフォルト値を取得
+        default_sensitivity = self._get_default_sensitivity()
+        self.sensitivity = config.get('sensitivity', default_sensitivity)
         self.check_interval = config.get('check_interval', 0.1)  # 100ms
         self.min_use_interval = config.get('min_use_interval', 0.5)  # 500ms
         
@@ -184,11 +186,15 @@ class TinctureModule:
             self.enabled = new_config.get('enabled', True)
             self.key = new_config.get('key', '3')
             self.monitor_config = new_config.get('monitor_config', 'Primary')
-            self.sensitivity = new_config.get('sensitivity', 0.7)
+            # 現在の感度をデフォルトとして使用（設定ファイルからの初期値を保持）
+            old_sensitivity = self.sensitivity
+            self.sensitivity = new_config.get('sensitivity', self.sensitivity)
             self.check_interval = new_config.get('check_interval', 0.1)
             self.min_use_interval = new_config.get('min_use_interval', 0.5)
             
             # 検出器の感度を更新
+            if old_sensitivity != self.sensitivity:
+                logger.info(f"TinctureModule sensitivity updated: {old_sensitivity:.3f} -> {self.sensitivity:.3f}")
             self.detector.update_sensitivity(self.sensitivity)
             
             # 有効/無効の状態変化に応じて起動/停止
@@ -277,6 +283,16 @@ class TinctureModule:
             'last_use_timestamp': None
         }
         logger.info("Tincture statistics reset")
+    
+    def _get_default_sensitivity(self) -> float:
+        """設定ファイルからデフォルト感度を取得"""
+        try:
+            config_manager = ConfigManager()
+            default_config = config_manager.load_config()
+            return default_config.get('tincture', {}).get('sensitivity', 0.7)
+        except Exception as e:
+            logger.warning(f"Failed to load default sensitivity from config: {e}")
+            return 0.7  # フォールバック値
     
     def __del__(self):
         """デストラクタ：リソースのクリーンアップ"""
