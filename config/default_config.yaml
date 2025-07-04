@@ -103,5 +103,6 @@ tincture:
 
 # Log monitoring settings
 log_monitor:
-  enabled: false
+  enabled: true
   log_path: "C:/Program Files (x86)/Steam/steamapps/common/Path of Exile/logs/Client.txt"
+  check_interval: 0.5

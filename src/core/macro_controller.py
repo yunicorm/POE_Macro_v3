@@ -2,13 +2,21 @@
 マクロ統合制御モジュール
 """
 import logging
-import pynput
 import threading
 from typing import Dict, Any, Optional
+
+# pynputの条件付きインポート
+try:
+    import pynput
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    PYNPUT_AVAILABLE = False
+    pynput = None
 
 from modules.flask_module import FlaskModule
 from modules.skill_module import SkillModule
 from modules.tincture_module import TinctureModule
+from modules.log_monitor import LogMonitor
 from core.config_manager import ConfigManager
 from utils.window_manager import WindowManager
 
@@ -85,6 +93,19 @@ class MacroController:
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise
+        
+        # LogMonitorの初期化
+        try:
+            logger.debug("Initializing LogMonitor...")
+            log_monitor_config = self.config.get('log_monitor', {})
+            self.log_monitor = LogMonitor(log_monitor_config, macro_controller=self, full_config=self.config)
+            logger.debug("LogMonitor initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize LogMonitor: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            # LogMonitorは必須ではないので、エラーでも継続
+            self.log_monitor = None
         
         # 制御状態
         self.running = False
@@ -205,6 +226,16 @@ class MacroController:
             else:
                 logger.info("Tincture module not started - no valid config")
             
+            # LogMonitorの開始
+            if self.log_monitor:
+                try:
+                    self.log_monitor.start()
+                    logger.info("LogMonitor started successfully")
+                except Exception as e:
+                    logger.error(f"Failed to start LogMonitor: {e}")
+            else:
+                logger.info("LogMonitor not available")
+            
             # ホットキーは初期化時に設定済み
             
             logger.info("MacroController started successfully")
@@ -249,6 +280,14 @@ class MacroController:
             logger.info("Tincture module stopped")
         except Exception as e:
             logger.error(f"Error stopping tincture module: {e}")
+        
+        # LogMonitorの停止
+        if self.log_monitor:
+            try:
+                self.log_monitor.stop()
+                logger.info("LogMonitor stopped")
+            except Exception as e:
+                logger.error(f"Error stopping LogMonitor: {e}")
         
         # ホットキーリスナーの停止
         if self.hotkey_listener:

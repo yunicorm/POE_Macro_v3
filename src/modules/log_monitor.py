@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
 class LogMonitor:
     """POEログファイルを監視してマクロを自動制御するクラス"""
     
-    def __init__(self, config: Dict[str, Any], macro_controller=None):
+    def __init__(self, config: Dict[str, Any], macro_controller=None, full_config: Dict[str, Any] = None):
         self.config = config
         self.macro_controller = macro_controller
+        self.full_config = full_config or {}
         
         # ログファイルパス（Steam版優先で自動検出）
         self.log_file_path = Path(config.get('log_path', self._find_client_log_path()))
@@ -82,11 +83,16 @@ class LogMonitor:
         self.on_area_enter = None
         self.on_area_exit = None
         
-        # Grace Period設定
-        self.grace_period_config = config.get('grace_period', {})
+        # Grace Period設定（全体設定から取得）
+        self.grace_period_config = self.full_config.get('grace_period', {})
         self.grace_period_enabled = self.grace_period_config.get('enabled', False)
         self.wait_for_input = self.grace_period_config.get('wait_for_input', True)
         self.trigger_inputs = self.grace_period_config.get('trigger_inputs', ['mouse_left', 'mouse_right', 'mouse_middle', 'q'])
+        
+        # Grace Period設定デバッグログ
+        logger.info(f"Grace Period settings: enabled={self.grace_period_enabled}, wait_for_input={self.wait_for_input}")
+        logger.info(f"Grace Period trigger inputs: {self.trigger_inputs}")
+        logger.info(f"pynput available: {PYNPUT_AVAILABLE}")
         
         # Grace Period状態管理
         self.grace_period_active = False
