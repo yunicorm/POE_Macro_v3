@@ -142,8 +142,23 @@ class MainWindow(QMainWindow):
         self.sensitivity_slider.valueChanged.connect(self.update_sensitivity_label)
         tincture_layout.addWidget(self.sensitivity_slider, 3, 1)
         
-        self.sensitivity_label = QLabel(f"{sensitivity}%")
+        self.sensitivity_label = QLabel(f"{sensitivity / 100:.2f}")
         tincture_layout.addWidget(self.sensitivity_label, 3, 2)
+        
+        # 詳細設定
+        tincture_layout.addWidget(QLabel("チェック間隔(ms):"), 4, 0)
+        self.check_interval_spinbox = QSpinBox()
+        self.check_interval_spinbox.setRange(50, 1000)  # 50ms～1000ms
+        check_interval = int(self.config.get('tincture', {}).get('check_interval', 0.1) * 1000)
+        self.check_interval_spinbox.setValue(check_interval)
+        tincture_layout.addWidget(self.check_interval_spinbox, 4, 1)
+        
+        tincture_layout.addWidget(QLabel("最小使用間隔(ms):"), 5, 0)
+        self.min_use_interval_spinbox = QSpinBox()
+        self.min_use_interval_spinbox.setRange(100, 5000)  # 100ms～5000ms
+        min_use_interval = int(self.config.get('tincture', {}).get('min_use_interval', 0.5) * 1000)
+        self.min_use_interval_spinbox.setValue(min_use_interval)
+        tincture_layout.addWidget(self.min_use_interval_spinbox, 5, 1)
         
         layout.addWidget(tincture_group)
         
@@ -177,6 +192,21 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.reset_stats_btn)
         
         layout.addLayout(button_layout)
+        
+        # 設定保存・適用ボタン
+        settings_button_layout = QHBoxLayout()
+        
+        self.save_tincture_btn = QPushButton("設定を保存")
+        self.save_tincture_btn.clicked.connect(self.save_tincture_settings)
+        self.save_tincture_btn.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }")
+        settings_button_layout.addWidget(self.save_tincture_btn)
+        
+        self.apply_tincture_btn = QPushButton("設定を適用（保存せずに）")
+        self.apply_tincture_btn.clicked.connect(self.apply_tincture_settings)
+        self.apply_tincture_btn.setStyleSheet("QPushButton { background-color: #2196F3; color: white; }")
+        settings_button_layout.addWidget(self.apply_tincture_btn)
+        
+        layout.addLayout(settings_button_layout)
         layout.addStretch()
         
         self.tab_widget.addTab(widget, "Tincture")
@@ -675,7 +705,72 @@ class MainWindow(QMainWindow):
     
     def update_sensitivity_label(self, value):
         """感度ラベルを更新"""
-        self.sensitivity_label.setText(f"{value}%")
+        sensitivity = value / 100.0
+        self.sensitivity_label.setText(f"{sensitivity:.2f}")
+    
+    def save_tincture_settings(self):
+        """Tincture設定を保存"""
+        try:
+            # 現在のUI値を取得
+            tincture_config = {
+                'enabled': self.tincture_enabled_cb.isChecked(),
+                'key': self.tincture_key_edit.text(),
+                'monitor_config': self.monitor_combo.currentText(),
+                'sensitivity': self.sensitivity_slider.value() / 100.0,  # 0-100 → 0.0-1.0
+                'check_interval': self.check_interval_spinbox.value() / 1000.0,  # ms → s
+                'min_use_interval': self.min_use_interval_spinbox.value() / 1000.0,  # ms → s
+            }
+            
+            # 現在の設定を保持（検出モード等）
+            current_tincture_config = self.config.get('tincture', {})
+            current_tincture_config.update(tincture_config)
+            self.config['tincture'] = current_tincture_config
+            
+            # ファイルに保存
+            self.config_manager.save_config(self.config)
+            
+            # 実行中のマクロに反映
+            if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
+                tincture_module = self.macro_controller.tincture_module
+                if tincture_module:
+                    tincture_module.update_config(tincture_config)
+                    self.log_message("実行中のTinctureModuleに設定を反映しました")
+                    
+            self.log_message(f"Tincture設定を保存しました（感度: {tincture_config['sensitivity']:.2f}, キー: {tincture_config['key']}）")
+            
+        except Exception as e:
+            self.log_message(f"Tincture設定保存エラー: {e}")
+            import traceback
+            logger.error(f"Tincture settings save error: {traceback.format_exc()}")
+    
+    def apply_tincture_settings(self):
+        """Tincture設定を一時的に適用（保存なし）"""
+        try:
+            if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
+                tincture_module = self.macro_controller.tincture_module
+                if tincture_module:
+                    # 現在の値で一時的に更新
+                    tincture_module.sensitivity = self.sensitivity_slider.value() / 100.0
+                    tincture_module.key = self.tincture_key_edit.text()
+                    tincture_module.enabled = self.tincture_enabled_cb.isChecked()
+                    tincture_module.check_interval = self.check_interval_spinbox.value() / 1000.0
+                    tincture_module.min_use_interval = self.min_use_interval_spinbox.value() / 1000.0
+                    
+                    # detectorの感度も更新
+                    if tincture_module.detector:
+                        tincture_module.detector.sensitivity = tincture_module.sensitivity
+                        self.log_message(f"Detector感度を更新: {tincture_module.sensitivity:.2f}")
+                    
+                    self.log_message(f"Tincture設定を一時適用しました（感度: {tincture_module.sensitivity:.2f}, キー: {tincture_module.key}）")
+                else:
+                    self.log_message("TinctureModuleが無効のため、設定を適用できませんでした")
+            else:
+                self.log_message("MacroControllerが開始されていないため、設定を適用できませんでした")
+        
+        except Exception as e:
+            self.log_message(f"Tincture設定適用エラー: {e}")
+            import traceback
+            logger.error(f"Tincture settings apply error: {traceback.format_exc()}")
     
     def start_macro(self):
         """マクロを開始"""
