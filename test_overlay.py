@@ -108,7 +108,7 @@ def test_overlay_window():
         print("  - Shift+矢印: サイズ調整")
         print("  - Ctrl+S: 設定保存")
         print("  - F9: 表示/非表示切り替え")
-        print("  - Escape: 終了")
+        print("  - F10: 終了")
         
         # アプリケーション実行
         result = app.exec_()

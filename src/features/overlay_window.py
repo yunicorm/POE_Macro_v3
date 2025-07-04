@@ -192,9 +192,11 @@ class OverlayWindow(QWidget):
         """キーボードイベント"""
         modifiers = QApplication.keyboardModifiers()
         
-        if event.key() == Qt.Key_Escape:
-            # Escapeキーで終了
+        if event.key() == Qt.Key_F10:
+            # F10キーで終了（ESCはゲームメニューと衝突するため）
+            event.accept()
             self.close_overlay()
+            return
             
         elif event.key() == Qt.Key_S and modifiers & Qt.ControlModifier:
             # Ctrl+Sで保存
