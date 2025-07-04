@@ -36,9 +36,20 @@ class TinctureDetector:
         self.area_selector = area_selector
         self.config = config or {}
         
-        # 検出モードの設定
+        # 検出モードの設定（詳細ログ付き）
         tincture_config = self.config.get('tincture', {})
         self.detection_mode = tincture_config.get('detection_mode', 'full_flask_area')
+        
+        logger.info(f"[INIT] TinctureDetector初期化開始")
+        logger.info(f"[INIT] 設定された検出モード: {self.detection_mode}")
+        logger.info(f"[INIT] 検出感度: {self.sensitivity}")
+        logger.info(f"[INIT] モニター設定: {monitor_config}")
+        
+        # 設定構造のデバッグ出力
+        if tincture_config:
+            logger.debug(f"[INIT] Tincture設定内容: {tincture_config}")
+        else:
+            logger.warning(f"[INIT] Tincture設定が見つかりません。デフォルト値を使用します")
         
         # 手動検出エリアの設定
         self.manual_detection_area = None
@@ -51,7 +62,9 @@ class TinctureDetector:
                     'width': manual_area.get('width', 80),
                     'height': manual_area.get('height', 120)
                 }
-                logger.info(f"Using manual detection area: {self.manual_detection_area}")
+                logger.info(f"[INIT] 手動検出エリアを設定: X={self.manual_detection_area['left']}, Y={self.manual_detection_area['top']}, W={self.manual_detection_area['width']}, H={self.manual_detection_area['height']}")
+            else:
+                logger.warning(f"[INIT] 手動モードですが検出エリア設定が見つかりません")
         
         # モニター設定の検証
         if monitor_config not in self.MONITOR_CONFIGS:
@@ -62,9 +75,24 @@ class TinctureDetector:
             try:
                 from src.features.area_selector import AreaSelector
                 self.area_selector = AreaSelector()
+                logger.info(f"[INIT] AreaSelectorを新規作成しました")
             except ImportError:
                 logger.warning("AreaSelector not available, using fallback detection area")
                 self.area_selector = None
+        else:
+            logger.info(f"[INIT] 既存のAreaSelectorを使用します")
+        
+        # 初期化時の検出エリア情報をログ出力
+        if self.area_selector:
+            try:
+                if self.detection_mode == 'full_flask_area':
+                    area_info = self.area_selector.get_full_flask_area_for_tincture()
+                    logger.info(f"[INIT] フラスコエリア全体検出: X={area_info['x']}, Y={area_info['y']}, W={area_info['width']}, H={area_info['height']}")
+                elif self.detection_mode == 'auto_slot3':
+                    area_info = self.area_selector.get_absolute_tincture_area()
+                    logger.info(f"[INIT] 3番スロット自動計算: X={area_info['x']}, Y={area_info['y']}, W={area_info['width']}, H={area_info['height']}")
+            except Exception as e:
+                logger.warning(f"[INIT] 検出エリア情報の取得に失敗: {e}")
         
         # テンプレート画像を読み込み（解像度別は不要）
         self.template_path = Path("assets/images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png")

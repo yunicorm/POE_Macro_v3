@@ -375,17 +375,104 @@ class MainWindow(QMainWindow):
         self.height_spinbox.setValue(height)
         
     def on_settings_saved(self):
-        """設定が保存された時の処理"""
+        """設定が保存された時の処理（包括的設定更新）"""
         try:
             if self.overlay_window and self.area_selector:
                 area = self.overlay_window.get_area()
-                self.area_selector.set_flask_area(
-                    area['x'], area['y'], area['width'], area['height']
-                )
-                self.log_message("検出エリア設定を保存しました")
+                x, y, width, height = area['x'], area['y'], area['width'], area['height']
+                
+                # AreaSelectorを更新
+                self.area_selector.set_flask_area(x, y, width, height)
+                
+                # GUIの表示を更新
+                self.current_area_label.setText(f"X: {x}, Y: {y}, W: {width}, H: {height}")
+                self.x_spinbox.setValue(x)
+                self.y_spinbox.setValue(y)
+                self.width_spinbox.setValue(width)
+                self.height_spinbox.setValue(height)
+                
+                # default_config.yamlの設定も更新
+                new_area = {'x': x, 'y': y, 'width': width, 'height': height}
+                
+                if 'tincture' not in self.config:
+                    self.config['tincture'] = {}
+                
+                # フラスコエリア全体検出モードに設定
+                self.config['tincture']['detection_mode'] = 'full_flask_area'
+                self.config['tincture']['detection_area'] = new_area
+                self.config_manager.save_config(self.config)
+                
+                # MacroControllerのTinctureモジュールに変更を伝播
+                self._update_tincture_detector_settings()
+                
+                self.log_message(f"検出エリア設定を保存しました: ({x}, {y}, {width}, {height})")
+                self.log_message("フラスコエリア全体検出モードに切り替えました")
                 
         except Exception as e:
             self.log_message(f"設定保存エラー: {e}")
+            import traceback
+            self.log_message(f"詳細エラー: {traceback.format_exc()}")
+    
+    def _update_tincture_detector_settings(self):
+        """TinctureDetectorの設定を更新（必要に応じて再初期化）"""
+        try:
+            if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
+                tincture_module = self.macro_controller.tincture_module
+                if tincture_module:
+                    # 既存のDetectorの設定を更新
+                    detector = tincture_module.detector
+                    if detector and hasattr(detector, 'set_detection_mode'):
+                        detector.set_detection_mode('full_flask_area')
+                        self.log_message("TinctureDetector検出モードを更新しました")
+                    
+                    # AreaSelectorも更新
+                    if hasattr(tincture_module, 'update_detection_area'):
+                        tincture_module.update_detection_area(self.area_selector)
+                        self.log_message("TinctureModule検出エリアを更新しました")
+                    
+                    # 設定の強制再読み込み（重要：新しい設定を確実に反映）
+                    if hasattr(tincture_module, 'update_config'):
+                        updated_config = self.config.get('tincture', {})
+                        tincture_module.update_config(updated_config)
+                        self.log_message("TinctureModule設定を強制再読み込みしました")
+                    
+                    # TinctureDetectorの再初期化（最も確実な方法）
+                    self._reinitialize_tincture_detector()
+                        
+        except Exception as e:
+            self.log_message(f"TinctureDetector設定更新エラー: {e}")
+            import traceback
+            self.log_message(f"詳細エラー: {traceback.format_exc()}")
+    
+    def _reinitialize_tincture_detector(self):
+        """TinctureDetectorを再初期化して新しい設定を確実に適用"""
+        try:
+            if self.macro_controller and hasattr(self.macro_controller, 'tincture_module'):
+                tincture_module = self.macro_controller.tincture_module
+                if tincture_module:
+                    # 現在の設定を取得
+                    tincture_config = self.config.get('tincture', {})
+                    
+                    # TinctureDetectorを再作成
+                    from src.features.image_recognition import TinctureDetector
+                    
+                    new_detector = TinctureDetector(
+                        monitor_config=tincture_config.get('monitor_config', 'Primary'),
+                        sensitivity=tincture_config.get('sensitivity', 0.7),
+                        area_selector=self.area_selector,
+                        config=self.config
+                    )
+                    
+                    # 古いDetectorを新しいものに置き換え
+                    tincture_module.detector = new_detector
+                    
+                    self.log_message("TinctureDetectorを再初期化しました")
+                    self.log_message(f"新しい検出モード: {new_detector.detection_mode}")
+                    
+        except Exception as e:
+            self.log_message(f"TinctureDetector再初期化エラー: {e}")
+            import traceback
+            self.log_message(f"詳細エラー: {traceback.format_exc()}")
     
     def on_overlay_closed(self):
         """オーバーレイが閉じられた時の処理"""
