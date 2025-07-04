@@ -36,6 +36,11 @@ class MainWindow(QMainWindow):
         self.update_timer.start(1000)  # 1秒毎
         
         logger.info("MainWindow initialized")
+        
+        # ウィンドウ表示後に自動的にマクロを開始
+        if self.is_config_valid():
+            # 少し遅延を入れてGUIが完全に初期化されるのを待つ
+            QTimer.singleShot(500, self.auto_start_macro)
     
     def init_ui(self):
         """UI要素を初期化"""
@@ -707,6 +712,41 @@ class MainWindow(QMainWindow):
         """感度ラベルを更新"""
         sensitivity = value / 100.0
         self.sensitivity_label.setText(f"{sensitivity:.2f}")
+    
+    def is_config_valid(self):
+        """設定が有効かどうかをチェック"""
+        try:
+            # 最低限必要な設定がそろっているかチェック
+            if not self.config:
+                logger.warning("Config is empty")
+                return False
+            
+            # 少なくとも一つのモジュールが有効になっているかチェック
+            flask_enabled = self.config.get('flask', {}).get('enabled', False)
+            skills_enabled = self.config.get('skills', {}).get('enabled', False)
+            tincture_enabled = self.config.get('tincture', {}).get('enabled', False)
+            
+            if not (flask_enabled or skills_enabled or tincture_enabled):
+                logger.info("No modules are enabled, skipping auto-start")
+                return False
+            
+            logger.info("Config is valid for auto-start")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Config validation error: {e}")
+            return False
+    
+    def auto_start_macro(self):
+        """自動的にマクロを開始"""
+        try:
+            logger.info("Auto-starting macro...")
+            self.log_message("設定が有効なため、マクロを自動開始します")
+            self.start_macro()
+            
+        except Exception as e:
+            logger.error(f"Auto-start error: {e}")
+            self.log_message(f"自動開始エラー: {e}")
     
     def save_tincture_settings(self):
         """Tincture設定を保存"""
