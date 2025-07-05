@@ -16,6 +16,13 @@ ENV/
 
 # Project specific
 *.log
+*.log.*
+logs/
+log/
+*.txt.log
+debug.log
+error.log
+access.log
 config/user_config.yaml
 .env
 
