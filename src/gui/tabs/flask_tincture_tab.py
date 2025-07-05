@@ -186,7 +186,9 @@ class FlaskTinctureTab(BaseTab):
         slot_widgets['detail_label'] = detail_label
         detail_label.hide()  # 初期状態では非表示
         
-        detail_combo = SearchableComboBox()
+        # ★ ここが重要：SearchableComboBoxを使用
+        from src.gui.widgets.searchable_combobox import SearchableComboBox
+        detail_combo = SearchableComboBox()  # QComboBox()ではなくSearchableComboBox()
         detail_combo.currentTextChanged.connect(lambda text: self.on_detail_changed(slot_num, text))
         detail_combo.hide()  # 初期状態では非表示
         slot_widgets['detail'] = detail_combo
@@ -471,6 +473,10 @@ class FlaskTinctureTab(BaseTab):
         widgets = self.flask_slot_widgets[slot_num]
         flask_type = widgets['flask_type'].currentText()
         
+        # デバッグログ
+        print(f"[DEBUG] on_rarity_changed: slot={slot_num}, rarity={rarity}, flask_type={flask_type}")
+        print(f"[DEBUG] detail widget type: {type(widgets['detail'])}")
+        
         if rarity == "Magic":
             if flask_type == "Utility":
                 # Utility + Magicの場合はベースタイプ選択を表示
@@ -482,11 +488,14 @@ class FlaskTinctureTab(BaseTab):
                 
                 # ユーティリティベースタイプをdetailに設定
                 base_types = self.flask_data_manager.get_utility_base_types()
+                print(f"[DEBUG] base_types: {base_types}")  # デバッグログ
+                
                 widgets['detail'].clear()
                 widgets['detail'].addItems(base_types)
                 
                 # 検索ヒントを設定
-                widgets['detail'].lineEdit().setPlaceholderText("タイプして検索...")
+                if hasattr(widgets['detail'], 'lineEdit'):
+                    widgets['detail'].lineEdit().setPlaceholderText("タイプして検索...")
                 
                 # 最初のアイテムが選択された場合の持続時間を設定
                 if base_types:
