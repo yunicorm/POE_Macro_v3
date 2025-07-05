@@ -1,0 +1,10 @@
+status_overlay:
+  x: 1720
+  y: 1050
+  width: 150
+  height: 40
+  visible: true
+  opacity: 0.8
+  font_size: 16
+  always_on_top: true
+  click_through: true
