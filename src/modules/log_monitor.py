@@ -9,6 +9,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
+from datetime import datetime, timedelta
 
 # Grace Period機能用インポート
 try:
@@ -86,18 +87,29 @@ class LogMonitor:
         # Grace Period設定（全体設定から取得）
         self.grace_period_config = self.full_config.get('grace_period', {})
         self.grace_period_enabled = self.grace_period_config.get('enabled', False)
-        self.wait_for_input = self.grace_period_config.get('wait_for_input', True)
-        self.trigger_inputs = self.grace_period_config.get('trigger_inputs', ['mouse_left', 'mouse_right', 'mouse_middle', 'q'])
+        self.grace_period_duration = self.grace_period_config.get('duration', 60)  # 60秒固定
+        self.clear_cache_on_reenter = self.grace_period_config.get('clear_cache_on_reenter', True)
+        
+        # トリガー入力設定の解析
+        trigger_config = self.grace_period_config.get('trigger_inputs', {})
+        self.mouse_triggers = trigger_config.get('mouse_buttons', ['left', 'right', 'middle'])
+        self.keyboard_triggers = trigger_config.get('keyboard_keys', ['q'])
         
         # Grace Period設定デバッグログ
-        logger.info(f"Grace Period settings: enabled={self.grace_period_enabled}, wait_for_input={self.wait_for_input}")
-        logger.info(f"Grace Period trigger inputs: {self.trigger_inputs}")
+        logger.info(f"Grace Period settings: enabled={self.grace_period_enabled}, duration={self.grace_period_duration}s")
+        logger.info(f"Mouse triggers: {self.mouse_triggers}")
+        logger.info(f"Keyboard triggers: {self.keyboard_triggers}")
+        logger.info(f"Clear cache on reenter: {self.clear_cache_on_reenter}")
         logger.info(f"pynput available: {PYNPUT_AVAILABLE}")
         
         # Grace Period状態管理
         self.grace_period_active = False
         self.input_listeners = []
-        self.current_area_needs_grace = False
+        self.grace_period_timer = None
+        self.grace_period_start_time = None
+        
+        # エリアキャッシュ管理（再入場時のGrace Period制御）
+        self.area_cache = {}  # {area_name: last_enter_time}
         
     def _find_client_log_path(self) -> str:
         """POE Client.txtファイルのパスを自動検出"""
@@ -280,11 +292,32 @@ class LogMonitor:
         # 安全なエリア（町・隠れ家）以外でマクロを有効化
         if not self._is_safe_area(self.current_area):
             # Grace Period機能が有効かチェック
-            if self.grace_period_enabled and self.wait_for_input:
-                # 毎回入力待機（キャッシュ機能削除）
-                logger.info(f"Entering grace period - waiting for player input...")
-                self.current_area_needs_grace = True
-                self._start_grace_period()
+            if self.grace_period_enabled:
+                should_start_grace_period = True
+                current_time = datetime.now()
+                
+                if self.clear_cache_on_reenter:
+                    # clear_cache_on_reenter: true の場合は常にGrace Period開始
+                    logger.info(f"Starting Grace Period (60s timeout, cache cleared) - waiting for player input...")
+                else:
+                    # clear_cache_on_reenter: false の場合はキャッシュをチェック
+                    if self.current_area in self.area_cache:
+                        last_enter_time = self.area_cache[self.current_area]
+                        if current_time - last_enter_time < timedelta(hours=1):  # 1時間以内
+                            should_start_grace_period = False
+                            logger.info(f"Skipping Grace Period (recent entry within 1h): {self.current_area}")
+                    
+                    if should_start_grace_period:
+                        logger.info(f"Starting Grace Period (60s timeout) - waiting for player input...")
+                
+                if should_start_grace_period:
+                    # エリアキャッシュを更新
+                    self.area_cache[self.current_area] = current_time
+                    self._start_grace_period()
+                else:
+                    # Grace Periodをスキップしてマクロ開始
+                    self._activate_macro()
+                    logger.info(f"Macro activated (Grace Period skipped): {self.current_area}")
             else:
                 self._activate_macro()
                 logger.info(f"Macro activated for area: {self.current_area}")
@@ -397,11 +430,19 @@ class LogMonitor:
             return  # 既に待機中
             
         self.grace_period_active = True
+        self.grace_period_start_time = datetime.now()
         
         try:
+            # 60秒タイマーを開始
+            self.grace_period_timer = threading.Timer(
+                self.grace_period_duration,
+                self._on_grace_period_timeout
+            )
+            self.grace_period_timer.start()
+            
             # 入力監視開始
             self._start_input_monitoring()
-            logger.info("Grace Period started - waiting for player input...")
+            logger.info(f"Grace Period started - waiting for player input or {self.grace_period_duration}s timeout...")
             
         except Exception as e:
             logger.error(f"Error starting Grace Period: {e}")
@@ -414,12 +455,30 @@ class LogMonitor:
             return
             
         self.grace_period_active = False
-        self.current_area_needs_grace = False
+        self.grace_period_start_time = None
+        
+        # タイマーをキャンセル
+        if self.grace_period_timer:
+            self.grace_period_timer.cancel()
+            self.grace_period_timer = None
         
         # 入力監視を停止
         self._stop_input_monitoring()
         
         logger.info("Grace Period stopped")
+    
+    def _on_grace_period_timeout(self):
+        """Grace Period タイムアウト時の処理（60秒経過）"""
+        if not self.grace_period_active:
+            return
+            
+        logger.info(f"Grace Period timeout ({self.grace_period_duration}s) - starting macro automatically")
+        
+        # Grace Period終了
+        self._stop_grace_period()
+        
+        # マクロ自動開始
+        self._activate_macro()
     
     def _start_input_monitoring(self):
         """入力監視を開始"""
@@ -427,24 +486,23 @@ class LogMonitor:
             return
             
         try:
-            # マウス監視
-            if any(trigger in ['mouse_left', 'mouse_right', 'mouse_middle'] for trigger in self.trigger_inputs):
+            # マウス監視（設定されたマウスボタンがある場合のみ）
+            if self.mouse_triggers:
                 mouse_listener = mouse.Listener(
                     on_click=self._on_mouse_click
                 )
                 mouse_listener.start()
                 self.input_listeners.append(mouse_listener)
-                logger.debug("Mouse input monitoring started")
+                logger.debug(f"Mouse input monitoring started for buttons: {self.mouse_triggers}")
             
-            # キーボード監視
-            keyboard_triggers = [trigger for trigger in self.trigger_inputs if trigger not in ['mouse_left', 'mouse_right', 'mouse_middle']]
-            if keyboard_triggers:
+            # キーボード監視（設定されたキーがある場合のみ）
+            if self.keyboard_triggers:
                 keyboard_listener = keyboard.Listener(
                     on_press=self._on_key_press
                 )
                 keyboard_listener.start()
                 self.input_listeners.append(keyboard_listener)
-                logger.debug(f"Keyboard input monitoring started for keys: {keyboard_triggers}")
+                logger.debug(f"Keyboard input monitoring started for keys: {self.keyboard_triggers}")
                 
         except Exception as e:
             logger.error(f"Error starting input monitoring: {e}")
@@ -461,22 +519,26 @@ class LogMonitor:
         logger.debug("Input monitoring stopped")
     
     def _on_mouse_click(self, x, y, button, pressed):
-        """マウスクリック時の処理"""
+        """マウスクリック時の処理（特定ボタンのみ）"""
         if not pressed or not self.grace_period_active:
             return
             
         try:
+            # pynputのボタン名を取得
             button_name = button.name if hasattr(button, 'name') else str(button)
-            input_type = f"mouse_{button_name}"
             
-            if input_type in self.trigger_inputs:
-                self._on_grace_period_input(input_type)
+            # 設定された特定のマウスボタンのみを処理
+            if button_name in self.mouse_triggers:
+                logger.debug(f"Grace Period trigger input detected: mouse_{button_name}")
+                self._on_grace_period_input(f"mouse_{button_name}")
+            else:
+                logger.debug(f"Ignored mouse button (not in triggers): {button_name}")
                 
         except Exception as e:
             logger.error(f"Error handling mouse click: {e}")
     
     def _on_key_press(self, key):
-        """キー押下時の処理"""
+        """キー押下時の処理（特定キーのみ）"""
         if not self.grace_period_active:
             return
             
@@ -489,8 +551,12 @@ class LogMonitor:
             else:
                 key_str = str(key).lower()
             
-            if key_str in self.trigger_inputs:
+            # 設定された特定のキーのみを処理
+            if key_str in self.keyboard_triggers:
+                logger.debug(f"Grace Period trigger input detected: {key_str}")
                 self._on_grace_period_input(key_str)
+            else:
+                logger.debug(f"Ignored key (not in triggers): {key_str}")
                 
         except Exception as e:
             logger.error(f"Error handling key press: {e}")
@@ -499,8 +565,13 @@ class LogMonitor:
         """Grace Period中の入力検知時の処理"""
         if not self.grace_period_active:
             return
+        
+        # 経過時間を計算
+        elapsed_time = 0
+        if self.grace_period_start_time:
+            elapsed_time = (datetime.now() - self.grace_period_start_time).total_seconds()
             
-        logger.info(f"Player input detected ({input_type}) - starting macro")
+        logger.info(f"Player input detected ({input_type}) after {elapsed_time:.1f}s - starting macro")
         
         # Grace Period終了
         self._stop_grace_period()

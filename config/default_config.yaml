@@ -11,12 +11,11 @@ general:
 # Grace period settings (待機時間設定)
 grace_period:
   enabled: true
-  wait_for_input: true  # プレイヤー入力を待つ
+  duration: 60          # 60秒固定
   trigger_inputs:       # マクロ開始のトリガーとなる入力
-    - "mouse_left"      # 左クリック
-    - "mouse_right"     # 右クリック
-    - "mouse_middle"    # 中クリック
-    - "q"               # Qキー
+    mouse_buttons: ["left", "right", "middle"]
+    keyboard_keys: ["q"]
+  clear_cache_on_reenter: true
 
 # Hotkey settings
 hotkeys:
