@@ -415,10 +415,7 @@ class MacroController:
                 'waiting_for_input': self.waiting_for_input,
                 'grace_period_enabled': self.grace_period_enabled,
                 'emergency_stop': self.emergency_stop,
-                'flask': {
-                    'running': self.flask_module.running,
-                    'threads': len(self.flask_module.threads)
-                },
+                'flask': self.flask_module.get_status(),
                 'skill': {
                     'running': self.skill_module.running,
                     'threads': len(self.skill_module.threads),
@@ -435,7 +432,7 @@ class MacroController:
             return {
                 'running': self.running,
                 'emergency_stop': self.emergency_stop,
-                'flask': {'running': False, 'threads': 0},
+                'flask': {'running': False, 'enabled': False, 'flask_count': 0, 'active_flasks': []},
                 'skill': {'running': False, 'threads': 0, 'stats': {}},
                 'tincture': {'running': False, 'current_state': 'ERROR', 'stats': {}}
             }

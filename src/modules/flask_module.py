@@ -76,3 +76,27 @@ class FlaskModule:
         self.config = new_config
         if self.running:
             self.timer_manager.update_config(new_config)
+    
+    def get_status(self) -> Dict[str, Any]:
+        """モジュールのステータスを取得"""
+        status = {
+            'enabled': self.config.get('enabled', False),
+            'running': self.running,
+            'flask_count': 0,
+            'active_flasks': []
+        }
+        
+        if hasattr(self, 'timer_manager'):
+            # タイマーマネージャーから情報を取得
+            status['flask_count'] = self.timer_manager.get_timer_count()
+            
+            # アクティブなフラスコの情報を取得
+            all_stats = self.timer_manager.get_all_stats()
+            for slot_num, stats in all_stats.items():
+                if stats.get('is_running', False):
+                    status['active_flasks'].append({
+                        'slot': slot_num,
+                        'total_uses': stats.get('total_uses', 0)
+                    })
+        
+        return status

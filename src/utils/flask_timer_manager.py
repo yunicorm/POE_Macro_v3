@@ -247,6 +247,13 @@ class FlaskTimerManager:
                 stats[f'slot_{slot_num}'] = timer.get_stats()
             return stats
     
+    def get_all_stats(self) -> Dict[int, Dict]:
+        """全タイマーの統計情報を取得"""
+        stats = {}
+        for slot_num, timer in self.timers.items():
+            stats[slot_num] = timer.get_stats()
+        return stats
+    
     def get_timer_count(self) -> int:
         """アクティブなタイマー数を取得"""
         return len(self.timers)
