@@ -111,6 +111,7 @@ class MacroController:
         self.running = False
         self.emergency_stop = False
         self.waiting_for_input = False  # Grace Period待機状態
+        self.grace_period_active = False  # Grace Period活性状態
         self.grace_period_enabled = self.config.get('grace_period', {}).get('enabled', True)
         
         # グローバルホットキーリスナー
@@ -126,22 +127,33 @@ class MacroController:
         
         logger.info("MacroController initialized successfully")
         
-    def start(self, wait_for_input=False):
+    def start(self, wait_for_input=False, force=False, respect_grace_period=None):
         """全マクロモジュールを開始
         
         Args:
             wait_for_input: True の場合、Grace Period待機状態に入る
+            force: True の場合、Grace Period中でも強制開始
+            respect_grace_period: Grace Period設定を尊重するか（Noneの場合は設定ファイルから取得）
         """
         if self.running:
             logger.warning("MacroController already running")
-            return
+            return False
+        
+        # Grace Period中は強制指定がない限り開始を拒否
+        if self.grace_period_active and not force:
+            logger.info("Start request ignored - Grace Period active")
+            return False
+        
+        # Grace Period設定確認
+        if respect_grace_period is None:
+            respect_grace_period = self.config.get('general', {}).get('respect_grace_period', True)
         
         # Grace Period待機が有効で、待機指定がある場合
-        if self.grace_period_enabled and wait_for_input:
+        if self.grace_period_enabled and wait_for_input and respect_grace_period:
             logger.info("Entering Grace Period wait state...")
             self.waiting_for_input = True
             self._setup_input_listener()
-            return
+            return True
             
         try:
             # デバッグ: config構造を確認
@@ -497,6 +509,7 @@ class MacroController:
             self.input_listener = None
         
         logger.info("Setting up Grace Period input listener...")
+        self.grace_period_active = True
         
         def on_click(x, y, button, pressed):
             """マウスクリック検知"""
@@ -538,6 +551,7 @@ class MacroController:
     def _end_grace_period(self):
         """Grace Period待機を終了して通常のマクロ開始"""
         self.waiting_for_input = False
+        self.grace_period_active = False
         
         # 入力リスナーを停止
         if hasattr(self, 'mouse_listener') and self.mouse_listener:

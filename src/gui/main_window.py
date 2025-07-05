@@ -41,10 +41,13 @@ class MainWindow(QMainWindow):
         
         logger.info("MainWindow initialized")
         
-        # ウィンドウ表示後に自動的にマクロを開始
-        if self.is_config_valid():
+        # ウィンドウ表示後に自動的にマクロを開始（設定により制御）
+        auto_start_enabled = self.config.get('general', {}).get('auto_start_on_launch', False)
+        if auto_start_enabled and self.is_config_valid():
             # 少し遅延を入れてGUIが完全に初期化されるのを待つ
             QTimer.singleShot(500, self.auto_start_macro)
+        else:
+            logger.info("Auto-start disabled by configuration or invalid config")
     
     def init_ui(self):
         """UI要素を初期化"""
@@ -875,11 +878,19 @@ class MainWindow(QMainWindow):
             return False
     
     def auto_start_macro(self):
-        """自動的にマクロを開始"""
+        """自動的にマクロを開始（Grace Period考慮）"""
         try:
             logger.info("Auto-starting macro...")
             self.log_message("設定が有効なため、マクロを自動開始します")
-            self.start_macro()
+            
+            # Grace Period設定を確認
+            respect_grace_period = self.config.get('general', {}).get('respect_grace_period', True)
+            if respect_grace_period:
+                # Grace Periodを考慮した開始
+                self.start_macro_with_grace_period()
+            else:
+                # 従来通りの即座開始
+                self.start_macro()
             
         except Exception as e:
             logger.error(f"Auto-start error: {e}")
@@ -949,13 +960,48 @@ class MainWindow(QMainWindow):
             import traceback
             logger.error(f"Tincture settings apply error: {traceback.format_exc()}")
     
-    def start_macro(self):
-        """マクロを開始"""
+    def start_macro_with_grace_period(self):
+        """Grace Periodを考慮してマクロを開始"""
         try:
             if self.macro_controller:
-                self.macro_controller.start()
-                self.start_btn.setEnabled(False)
-                self.stop_btn.setEnabled(True)
+                # LogMonitorが現在のエリア状況を知っているかチェック
+                if (hasattr(self.macro_controller, 'log_monitor') and 
+                    self.macro_controller.log_monitor and
+                    self.macro_controller.log_monitor.in_area and
+                    not self.macro_controller.log_monitor._is_safe_area(self.macro_controller.log_monitor.current_area)):
+                    
+                    # 戦闘エリアにいる場合はGrace Period適用
+                    logger.info("Starting macro with Grace Period (in combat area)")
+                    self.log_message("戦闘エリアのため、Grace Period待機でマクロを開始します")
+                    success = self.macro_controller.start(wait_for_input=True)
+                    
+                    if success:
+                        self.log_message("Grace Period待機中... プレイヤー入力でマクロが開始されます")
+                    else:
+                        self.log_message("Grace Period開始に失敗しました（pynput未インストール）")
+                        self.start_macro()  # フォールバック
+                else:
+                    # 安全エリアまたはエリア不明の場合は即座開始
+                    logger.info("Starting macro immediately (safe area or unknown location)")
+                    self.log_message("安全エリアまたはエリア不明のため、即座にマクロを開始します")
+                    self.start_macro()
+            else:
+                self.log_message("マクロコントローラーが初期化されていません")
+                
+        except Exception as e:
+            logger.error(f"Grace Period macro start error: {e}")
+            self.log_message(f"Grace Period開始エラー: {e}")
+            # エラー時はフォールバック
+            self.start_macro()
+    
+    def start_macro(self):
+        """マクロを開始（従来通り）"""
+        try:
+            if self.macro_controller:
+                success = self.macro_controller.start(force=True)  # Grace Period無視
+                if success is not False:  # None or True
+                    self.start_btn.setEnabled(False)
+                    self.stop_btn.setEnabled(True)
                 self.statusBar().showMessage("マクロ実行中")
                 self.log_message("マクロを開始しました")
             else:

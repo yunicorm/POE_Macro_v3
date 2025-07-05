@@ -5,6 +5,8 @@ general:
   debug_mode: false
   log_level: INFO
   language: ja
+  auto_start_on_launch: false  # GUI起動時の自動始動
+  respect_grace_period: true   # Grace Period優先
 
 # Grace period settings (待機時間設定)
 grace_period:

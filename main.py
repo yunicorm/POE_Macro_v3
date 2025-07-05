@@ -131,8 +131,19 @@ def run_headless(macro_controller):
     logger = logging.getLogger(__name__)
     
     try:
-        # マクロを開始
-        macro_controller.start()
+        # Grace Period設定を確認してマクロを開始
+        config = macro_controller.config
+        respect_grace_period = config.get('general', {}).get('respect_grace_period', True)
+        
+        if respect_grace_period:
+            logger.info("Starting macro in headless mode with Grace Period support")
+            # Grace Periodを考慮（エリア状況に応じて待機）
+            macro_controller.start(respect_grace_period=True)
+        else:
+            logger.info("Starting macro in headless mode (Grace Period disabled)")
+            # 従来通り即座開始
+            macro_controller.start(force=True)
+            
         logger.info("Macro started in headless mode")
         logger.info("Press Ctrl+C to exit...")
         
