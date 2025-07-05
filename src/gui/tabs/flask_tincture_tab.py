@@ -87,6 +87,11 @@ class FlaskTinctureTab(BaseTab):
         for slot_num in range(1, 6):
             slot_widget = self.create_flask_slot_widget(slot_num)
             layout.addWidget(slot_widget)
+        
+        # 全スロット作成後にTinctureキー割り当てを更新
+        # (遅延実行でウィジェットが確実に存在するようにする)
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(100, self.update_tincture_key_assignment)
             
         return group
     
@@ -98,16 +103,21 @@ class FlaskTinctureTab(BaseTab):
         # ウィジェットを保存するディクショナリ
         slot_widgets = {}
         
+        # 保存された設定を読み込み
+        slot_config = self.config.get('flask_slots', {}).get(f'slot_{slot_num}', {})
+        
         # 割り当てキー
         layout.addWidget(QLabel("割り当てキー:"), 0, 0)
         key_edit = QLineEdit()
         key_edit.setMaximumWidth(50)
-        key_edit.setText(str(slot_num))  # デフォルトはスロット番号
+        # 保存された値があれば使用、なければデフォルト
+        key_edit.setText(slot_config.get('key', str(slot_num)))
         slot_widgets['key'] = key_edit
         layout.addWidget(key_edit, 0, 1)
         
         # Tinctureチェックボックス
         tincture_cb = QCheckBox("Tincture")
+        tincture_cb.setChecked(slot_config.get('is_tincture', False))
         tincture_cb.stateChanged.connect(lambda state: self.on_tincture_checked(slot_num, state))
         slot_widgets['is_tincture'] = tincture_cb
         layout.addWidget(tincture_cb, 0, 2)
@@ -116,6 +126,12 @@ class FlaskTinctureTab(BaseTab):
         layout.addWidget(QLabel("フラスコ属性:"), 1, 0)
         flask_type_combo = QComboBox()
         flask_type_combo.addItems(self.flask_data_manager.get_all_flask_types())
+        # 保存された値を設定
+        saved_flask_type = slot_config.get('flask_type', '')
+        if saved_flask_type:
+            index = flask_type_combo.findText(saved_flask_type)
+            if index >= 0:
+                flask_type_combo.setCurrentIndex(index)
         flask_type_combo.currentTextChanged.connect(lambda text: self.on_flask_type_changed(slot_num, text))
         slot_widgets['flask_type'] = flask_type_combo
         layout.addWidget(flask_type_combo, 1, 1, 1, 2)
@@ -127,6 +143,12 @@ class FlaskTinctureTab(BaseTab):
         
         rarity_combo = QComboBox()
         rarity_combo.addItems(self.flask_data_manager.get_all_rarities())
+        # 保存された値を設定
+        saved_rarity = slot_config.get('rarity', '')
+        if saved_rarity:
+            index = rarity_combo.findText(saved_rarity)
+            if index >= 0:
+                rarity_combo.setCurrentIndex(index)
         rarity_combo.currentTextChanged.connect(lambda text: self.on_rarity_changed(slot_num, text))
         slot_widgets['rarity'] = rarity_combo
         layout.addWidget(rarity_combo, 2, 1, 1, 2)
@@ -139,6 +161,12 @@ class FlaskTinctureTab(BaseTab):
         
         base_combo = QComboBox()
         base_combo.addItems(self.flask_data_manager.get_utility_bases())
+        # 保存された値を設定
+        saved_base = slot_config.get('base', '')
+        if saved_base:
+            index = base_combo.findText(saved_base)
+            if index >= 0:
+                base_combo.setCurrentIndex(index)
         base_combo.currentTextChanged.connect(lambda text: self.on_base_changed(slot_num, text))
         base_combo.hide()  # 初期状態では非表示
         slot_widgets['base'] = base_combo
@@ -155,6 +183,7 @@ class FlaskTinctureTab(BaseTab):
         detail_combo.hide()  # 初期状態では非表示
         slot_widgets['detail'] = detail_combo
         layout.addWidget(detail_combo, 4, 1, 1, 2)
+        # 保存された詳細値は後で設定（プルダウンが更新された後）
         
         # 持続時間入力
         layout.addWidget(QLabel("持続時間(秒):"), 5, 0)
@@ -162,12 +191,13 @@ class FlaskTinctureTab(BaseTab):
         duration_spinbox.setRange(0.0, 30.0)
         duration_spinbox.setDecimals(2)
         duration_spinbox.setSingleStep(0.1)
-        duration_spinbox.setValue(5.0)  # デフォルト5秒
+        duration_spinbox.setValue(slot_config.get('duration_seconds', 5.0))
         slot_widgets['duration'] = duration_spinbox
         layout.addWidget(duration_spinbox, 5, 1, 1, 2)
         
         # チャージフル使用チェックボックス
         charge_full_cb = QCheckBox("チャージがフルの時のみ使用")
+        charge_full_cb.setChecked(slot_config.get('use_when_full', False))
         slot_widgets['use_when_full'] = charge_full_cb
         layout.addWidget(charge_full_cb, 6, 0, 1, 3)
         
@@ -178,6 +208,23 @@ class FlaskTinctureTab(BaseTab):
         
         # ウィジェットを保存
         self.flask_slot_widgets[slot_num] = slot_widgets
+        
+        # 初期状態でプルダウンの表示/非表示を設定
+        if saved_flask_type:
+            self.on_flask_type_changed(slot_num, saved_flask_type)
+            if saved_rarity:
+                self.on_rarity_changed(slot_num, saved_rarity)
+                # 詳細値を設定する
+                saved_detail = slot_config.get('detail', '')
+                if saved_detail and not detail_combo.isHidden():
+                    index = detail_combo.findText(saved_detail)
+                    if index >= 0:
+                        detail_combo.setCurrentIndex(index)
+        
+        # Tinctureスロットの場合はキー割り当て更新
+        if slot_config.get('is_tincture', False):
+            # 他のスロット作成後にキー割り当てを更新するため、後で呼び出す
+            pass
         
         return slot_group
     
@@ -194,6 +241,8 @@ class FlaskTinctureTab(BaseTab):
         
         # Experienced Herbalistチェックボックス
         self.main_window.experienced_herbalist_cb = QCheckBox("Experienced Herbalist (2つのTincture装備可能)")
+        experienced_herbalist = self.get_config_value('tincture', 'experienced_herbalist', False)
+        self.main_window.experienced_herbalist_cb.setChecked(experienced_herbalist)
         self.main_window.experienced_herbalist_cb.stateChanged.connect(self.on_experienced_herbalist_changed)
         tincture_layout.addWidget(self.main_window.experienced_herbalist_cb, 1, 0, 1, 3)
         
@@ -249,10 +298,19 @@ class FlaskTinctureTab(BaseTab):
         self.main_window.min_use_interval_spinbox.setValue(min_use_interval)
         tincture_layout.addWidget(self.main_window.min_use_interval_spinbox, 8, 1)
         
+        # 初期状態でExperienced Herbalistの表示/非表示を適用
+        if experienced_herbalist:
+            self.on_experienced_herbalist_changed(Qt.Checked)
+        
         return tincture_group
     
     def create_tincture_settings(self, layout, tincture_num, row):
         """個別のTincture設定を作成"""
+        # 保存されたTincture設定を読み込み
+        tincture_configs = self.get_config_value('tincture', 'tinctures', {})
+        tincture_key = f'tincture{tincture_num}'
+        tincture_config = tincture_configs.get(tincture_key, {})
+        
         # 割り当てキー表示（読み取り専用）
         key_label = QLabel("キー: 未設定")
         if tincture_num == 1:
@@ -273,8 +331,12 @@ class FlaskTinctureTab(BaseTab):
         layout.addWidget(folder_btn, row, 2)
         
         # 選択されたフォルダパス表示
-        folder_path_label = QLabel("未選択")
-        folder_path_label.setStyleSheet("color: gray; font-size: 10px;")
+        saved_folder_path = tincture_config.get('folder_path', '未選択')
+        folder_path_label = QLabel(saved_folder_path)
+        if saved_folder_path != '未選択':
+            folder_path_label.setStyleSheet("color: black; font-size: 10px;")
+        else:
+            folder_path_label.setStyleSheet("color: gray; font-size: 10px;")
         if tincture_num == 1:
             self.main_window.tincture1_folder_path_label = folder_path_label
         else:
@@ -295,7 +357,9 @@ class FlaskTinctureTab(BaseTab):
         threshold_spinbox.setRange(0.1, 1.0)
         threshold_spinbox.setDecimals(2)
         threshold_spinbox.setSingleStep(0.05)
-        threshold_spinbox.setValue(0.8)  # デフォルト値
+        # 保存された値を使用、なければデフォルト値
+        saved_threshold = tincture_config.get('threshold', 0.8)
+        threshold_spinbox.setValue(saved_threshold)
         if tincture_num == 1:
             self.main_window.tincture1_threshold_spinbox = threshold_spinbox
         else:
