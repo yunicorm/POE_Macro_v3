@@ -285,25 +285,26 @@ class FlaskTimerManager:
                     
                     # Tinctureスロットはスキップ
                     if slot_config.get('is_tincture', False):
+                        logger.debug(f"Flask slot {slot_num} skipped: is_tincture is True")
                         continue
                     
-                    # ★ use_when_fullがTrueの場合もスキップ（マクロ自動化を無効化）
+                    # ★ use_when_fullがTrueの場合もスキップ（自動化を停止）
                     if slot_config.get('use_when_full', False):
-                        logger.info(f"Flask slot {slot_num} skipped: use_when_full is True (using in-game enchant)")
+                        logger.info(f"Flask slot {slot_num} skipped: automation disabled (use_when_full is True)")
                         continue
                     
                     key = slot_config.get('key', '')
                     duration_ms = slot_config.get('duration_ms', 5000)
                     
                     if key.strip():
-                        # use_when_fullは常にFalseでタイマーを作成
+                        # use_when_fullはFalseなのでタイマーを作成
                         self.add_flask_timer(slot_num, key, duration_ms, use_when_full=False)
                     
                 except (ValueError, KeyError) as e:
                     logger.error(f"Error parsing flask slot config {slot_key}: {e}")
         
         # フラスコが有効な場合はタイマーを開始
-        if flask_config.get('flask', {}).get('enabled', False):
+        if flask_config.get('enabled', False):
             self.start_all_timers()
         
         logger.info(f"Flask timer config updated: {self.get_timer_count()} timers loaded")
