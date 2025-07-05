@@ -13,12 +13,12 @@ except ImportError:
     PYNPUT_AVAILABLE = False
     pynput = None
 
-from modules.flask_module import FlaskModule
-from modules.skill_module import SkillModule
-from modules.tincture_module import TinctureModule
-from modules.log_monitor import LogMonitor
-from core.config_manager import ConfigManager
-from utils.window_manager import WindowManager
+from src.modules.flask_module import FlaskModule
+from src.modules.skill_module import SkillModule
+from src.modules.tincture_module import TinctureModule
+from src.modules.log_monitor import LogMonitor
+from src.core.config_manager import ConfigManager
+from src.utils.window_manager import WindowManager
 
 logger = logging.getLogger(__name__)
 

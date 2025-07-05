@@ -5,11 +5,77 @@ Path of Exile自動化マクロ v3.0の詳細な開発記録とトラブルシ�
 
 ## 📋 **最新の開発状況（2025-07-05）**
 
-### 🎯 **ステータスオーバーレイドラッグ機能修正完了**
+### 🎯 **Grace Period自動トグル機能実装完了（Phase 7）**
+
+#### **最新の成果（2025-07-05）**
+- ✅ **60秒タイムアウト機能**: threading.Timerによる自動制御
+- ✅ **特定入力フィルタリング**: 左/右/中クリック、Qキーのみ検知
+- ✅ **エリアキャッシュ制御**: clear_cache_on_reenter設定による再入場制御
+- ✅ **インポートエラー修正**: 全モジュールの絶対インポート統一
+- ✅ **設定ファイル正規化**: 新形式trigger_inputs構造への更新
 
 ## 📋 **問題と解決アプローチ**
 
-### **2025-07-05 最新修正: ステータスオーバーレイドラッグ機能**
+### **2025-07-05 最新修正: Grace Period自動トグル機能実装**
+
+#### **実装内容**
+**要件**: 戦闘エリア入場時の60秒タイムアウト + 特定入力検知
+**実装**: LogMonitorクラスの大幅拡張
+
+**主要な技術的決定事項**:
+1. **タイマー管理**: threading.Timerによる60秒固定タイムアウト
+2. **入力監視**: pynputによる特定入力のみフィルタリング
+3. **キャッシュ制御**: datetimeベースの正確な時間管理
+4. **エラー処理**: pynput未インストール時の自動フォールバック
+
+#### **解決した技術的課題**
+
+**1. インポートエラー解決**
+- **問題**: 相対インポートによるModuleNotFoundError
+- **解決**: 全モジュールで絶対インポートに統一
+```python
+# 修正前
+from modules.flask_module import FlaskModule
+
+# 修正後  
+from src.modules.flask_module import FlaskModule
+```
+
+**2. 設定ファイル構造の正規化**
+- **問題**: 新旧設定形式の混在による'list' object has no attribute 'get'エラー
+- **解決**: trigger_inputs構造の統一
+```yaml
+# 修正前（リスト形式）
+trigger_inputs:
+  - "mouse_left"
+  - "mouse_right"
+
+# 修正後（辞書形式）
+trigger_inputs:
+  mouse_buttons: ["left", "right", "middle"]
+  keyboard_keys: ["q"]
+```
+
+**3. エリアキャッシュロジック実装**
+- **要件**: clear_cache_on_reenter: trueで毎回Grace Period発動
+- **実装**: 条件分岐による適切なキャッシュ制御
+```python
+if self.clear_cache_on_reenter:
+    # 常にGrace Period開始
+    should_start_grace_period = True
+else:
+    # キャッシュをチェック（1時間以内はスキップ）
+    if current_time - last_enter_time < timedelta(hours=1):
+        should_start_grace_period = False
+```
+
+#### **テスト結果**
+- ✅ **コアロジックテスト**: 5/5完全合格
+- ✅ **構文チェック**: 全修正ファイル合格
+- ✅ **設定読み込み**: 新形式trigger_inputs正常動作
+- ✅ **タイマー機能**: 2秒テストタイマーで動作確認
+
+### **2025-07-05 前回修正: ステータスオーバーレイドラッグ機能**
 
 **問題**: ステータスオーバーレイのドラッグ機能が動作しない
 **解決**: `WindowTransparentForInput` → `WA_TransparentForMouseEvents` への変更
@@ -1950,7 +2016,152 @@ overlay:
 
 ---
 
+## 🔧 **Grace Period自動トグル機能 - 技術詳細**
+
+### **実装アーキテクチャ**
+
+#### **1. タイマー管理システム**
+```python
+# 60秒タイマーの実装
+self.grace_period_timer = threading.Timer(
+    self.grace_period_duration,  # 60秒固定
+    self._on_grace_period_timeout
+)
+self.grace_period_timer.start()
+```
+
+**特徴**:
+- スレッドセーフなタイマー管理
+- 適切なキャンセル処理
+- タイムアウト時の自動マクロ開始
+
+#### **2. 入力フィルタリングシステム**
+```python
+# マウス入力フィルタリング
+def _on_mouse_click(self, x, y, button, pressed):
+    button_name = button.name  # "left", "right", "middle"
+    if button_name in self.mouse_triggers:
+        self._on_grace_period_input(f"mouse_{button_name}")
+
+# キーボード入力フィルタリング
+def _on_key_press(self, key):
+    key_str = key.char.lower() if key.char else key.name.lower()
+    if key_str in self.keyboard_triggers:
+        self._on_grace_period_input(key_str)
+```
+
+**設計原則**:
+- 設定された入力のみを処理
+- その他の入力は完全に無視
+- 詳細なデバッグログ出力
+
+#### **3. エリアキャッシュ管理**
+```python
+# キャッシュ制御ロジック
+if self.clear_cache_on_reenter:
+    # 再入場時は常にGrace Period開始
+    should_start_grace_period = True
+else:
+    # 1時間以内の再入場はスキップ
+    if current_time - last_enter_time < timedelta(hours=1):
+        should_start_grace_period = False
+```
+
+**管理方式**:
+- datetime.nowベースの正確な時間管理
+- エリア名をキーとした辞書管理
+- 設定による動作切り替え
+
+### **開発ガイドライン**
+
+#### **インポート規約**
+```python
+# ✅ 推奨: 絶対インポート
+from src.modules.flask_module import FlaskModule
+from src.core.config_manager import ConfigManager
+
+# ❌ 非推奨: 相対インポート
+from modules.flask_module import FlaskModule
+from core.config_manager import ConfigManager
+```
+
+#### **設定ファイル形式**
+```yaml
+# ✅ 推奨: 構造化された設定
+trigger_inputs:
+  mouse_buttons: ["left", "right", "middle"]
+  keyboard_keys: ["q"]
+
+# ❌ 非推奨: フラットなリスト
+trigger_inputs:
+  - "mouse_left"
+  - "mouse_right"
+```
+
+#### **エラーハンドリング**
+```python
+# pynput依存関係の安全な処理
+try:
+    from pynput import mouse, keyboard
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    PYNPUT_AVAILABLE = False
+    mouse, keyboard = None, None
+
+# 実行時チェック
+if not PYNPUT_AVAILABLE:
+    logger.warning("pynput not available, Grace Period disabled")
+    self._activate_macro()  # フォールバック
+    return
+```
+
+### **テスト戦略**
+
+#### **1. コアロジックテスト（依存関係なし）**
+- 設定ファイル読み込み検証
+- タイマーロジック検証
+- エリアキャッシュロジック検証
+- 入力フィルタリングロジック検証
+
+#### **2. 統合テスト（Windows環境）**
+- pynput機能テスト
+- 実際の入力検知テスト
+- POEログファイル監視テスト
+- マクロ連携テスト
+
+### **パフォーマンス考慮事項**
+
+#### **メモリ使用量**
+- エリアキャッシュのサイズ制限不要（ゲームセッション単位）
+- タイマーオブジェクトの適切なクリーンアップ
+- リスナーの確実な停止処理
+
+#### **CPU使用率**
+- 入力監視はpynputによる効率的なイベント処理
+- ポーリングではなくイベント駆動
+- 不要なログ出力の制限
+
+### **今後の拡張ポイント**
+
+#### **機能拡張**
+1. **GUI統合**: 自動制御タブでのGrace Period設定UI
+2. **統計表示**: Grace Period使用回数・平均待機時間
+3. **カスタマイズ**: ユーザー定義の入力トリガー
+4. **プロファイル**: エリア別のGrace Period設定
+
+#### **技術改善**
+1. **設定検証**: YAML設定の妥当性チェック
+2. **ログ改善**: 構造化ログとフィルタリング
+3. **テスト拡充**: エッジケースのカバレッジ向上
+4. **ドキュメント**: ユーザーガイドの充実
+
+---
+
 **ドキュメント更新**: 2025-07-05  
-**Grace Period機能実装完了**: ✅ Ready for Production Testing  
-**ステータスオーバーレイ機能実装完了**: ✅ Ready for Production Testing  
+**Grace Period自動トグル機能実装完了**: ✅ Phase 7 Complete  
+**インポートエラー修正完了**: ✅ All Modules Fixed  
+**設定ファイル正規化完了**: ✅ New Format Applied  
+**テストスイート作成完了**: ✅ 5/5 Core Tests Passed  
 **統合完了**: ✅ MacroController + LogMonitor + Grace Period + StatusOverlay
+
+**Ready for Production Testing** 🚀
