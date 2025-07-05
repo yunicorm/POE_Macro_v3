@@ -37,9 +37,19 @@ class FlaskDataManager:
                     logger.warning(f"Flask data file not found: {file_path}")
                     self.flask_data[flask_type] = []
             
+            # ユーティリティベースタイプのCSVを追加読み込み
+            utility_bases_path = os.path.join(self.data_dir, "utility_bases.csv")
+            if os.path.exists(utility_bases_path):
+                self.utility_bases_data = self.load_csv_file(utility_bases_path)
+                logger.info(f"Loaded {len(self.utility_bases_data)} utility base types")
+            else:
+                logger.warning(f"Utility bases file not found: {utility_bases_path}")
+                self.utility_bases_data = []
+            
         except Exception as e:
             logger.error(f"Error loading flask data: {e}")
             self.flask_data = {}
+            self.utility_bases_data = []
     
     def load_csv_file(self, file_path: str) -> List[Dict]:
         """
@@ -243,3 +253,39 @@ class FlaskDataManager:
                     return False, f"指定されたフラスコタイプに対して無効なユニークフラスコです"
         
         return True, ""
+    
+    def get_utility_base_types(self) -> List[str]:
+        """
+        ユーティリティフラスコのベースタイプ一覧を取得
+        
+        Returns:
+            ベースタイプ名のリスト（アルファベット順）
+        """
+        if not hasattr(self, 'utility_bases_data'):
+            return []
+        
+        base_names = [item.get('base', '') for item in self.utility_bases_data if item.get('base')]
+        return sorted(base_names)
+    
+    def get_utility_base_duration(self, base_name: str) -> Optional[float]:
+        """
+        ユーティリティフラスコベースタイプの持続時間を取得
+        
+        Args:
+            base_name: ベースタイプ名
+            
+        Returns:
+            持続時間（秒）、見つからない場合はNone
+        """
+        if not hasattr(self, 'utility_bases_data'):
+            return None
+        
+        for item in self.utility_bases_data:
+            if item.get('base', '') == base_name:
+                duration_str = item.get('duration', '0')
+                try:
+                    return float(duration_str)
+                except ValueError:
+                    return None
+        
+        return None

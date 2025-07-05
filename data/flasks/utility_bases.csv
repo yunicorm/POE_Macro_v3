@@ -1,0 +1,19 @@
+base,duration,charges_used,charges_max,level_req,effect
+Quicksilver Flask,8.0,30,60,4,40% increased Movement Speed
+Bismuth Flask,8.5,15,40,8,+35% to all Elemental Resistances
+Amethyst Flask,6.5,35,65,18,+35% to Chaos Resistance
+Ruby Flask,8.0,20,50,18,+40% to Fire Resistance and +5% to maximum Fire Resistance
+Sapphire Flask,8.0,20,50,18,+40% to Cold Resistance and +5% to maximum Cold Resistance
+Topaz Flask,8.0,20,50,18,+40% to Lightning Resistance and +5% to maximum Lightning Resistance
+Aquamarine Flask,8.0,20,50,27,60% reduced Effect of Freeze on you and Creates Chilled Ground on Use
+Basalt Flask,8.0,40,60,27,20% more Armour and Taunts nearby Enemies on use
+Corundum Flask,7.5,20,50,27,30% increased Stun Threshold and Cannot be Stunned if you've been Stunned during Effect
+Diamond Flask,6.0,20,40,27,100% increased Global Critical Strike Chance
+Gold Flask,5.0,60,80,27,30% increased Rarity of Items found
+Granite Flask,6.0,30,60,27,+1500 to Armour
+Iron Flask,4.0,40,60,27,+200 to Ward and Restores Ward on use
+Jade Flask,6.0,30,60,27,+1500 to Evasion Rating
+Quartz Flask,6.0,30,60,27,Phasing and +10% chance to Suppress Spell Damage
+Silver Flask,6.0,40,60,27,Onslaught
+Stibnite Flask,8.0,40,60,27,20% more Evasion Rating and Creates a Smoke Cloud on Use
+Sulphur Flask,8.0,40,60,27,40% increased Damage and Creates Consecrated Ground on Use

@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
 from PyQt5.QtCore import Qt
 from .base_tab import BaseTab
 from src.utils.flask_data_manager import FlaskDataManager
+from src.gui.widgets.searchable_combobox import SearchableComboBox
 
 class FlaskTinctureTab(BaseTab):
     """Flask & Tincture integrated settings tab"""
@@ -16,6 +17,7 @@ class FlaskTinctureTab(BaseTab):
         super().__init__(main_window)
         self.flask_slot_widgets = {}  # フラスコスロットのウィジェットを保存
         self.flask_data_manager = FlaskDataManager()  # フラスコデータマネージャー
+        self.is_initializing = False  # 初期化中フラグを追加
         
     def create_widget(self):
         """Create flask & tincture tab widget"""
@@ -97,6 +99,9 @@ class FlaskTinctureTab(BaseTab):
     
     def create_flask_slot_widget(self, slot_num):
         """個別のフラスコスロットウィジェットを作成"""
+        # 初期化開始
+        self.is_initializing = True
+        
         slot_group = QGroupBox(f"スロット {slot_num}")
         layout = QGridLayout(slot_group)
         
@@ -105,6 +110,9 @@ class FlaskTinctureTab(BaseTab):
         
         # 保存された設定を読み込み
         slot_config = self.config.get('flask_slots', {}).get(f'slot_{slot_num}', {})
+        
+        # 保存された持続時間を記録
+        saved_duration = slot_config.get('duration_seconds', 5.0)
         
         # 割り当てキー
         layout.addWidget(QLabel("割り当てキー:"), 0, 0)
@@ -178,7 +186,7 @@ class FlaskTinctureTab(BaseTab):
         slot_widgets['detail_label'] = detail_label
         detail_label.hide()  # 初期状態では非表示
         
-        detail_combo = QComboBox()
+        detail_combo = SearchableComboBox()
         detail_combo.currentTextChanged.connect(lambda text: self.on_detail_changed(slot_num, text))
         detail_combo.hide()  # 初期状態では非表示
         slot_widgets['detail'] = detail_combo
@@ -191,7 +199,7 @@ class FlaskTinctureTab(BaseTab):
         duration_spinbox.setRange(0.0, 30.0)
         duration_spinbox.setDecimals(2)
         duration_spinbox.setSingleStep(0.1)
-        duration_spinbox.setValue(slot_config.get('duration_seconds', 5.0))
+        duration_spinbox.setValue(saved_duration)
         slot_widgets['duration'] = duration_spinbox
         layout.addWidget(duration_spinbox, 5, 1, 1, 2)
         
@@ -220,6 +228,10 @@ class FlaskTinctureTab(BaseTab):
                     index = detail_combo.findText(saved_detail)
                     if index >= 0:
                         detail_combo.setCurrentIndex(index)
+        
+        # 初期化完了後、保存された持続時間を再設定（上書きを防ぐため）
+        self.is_initializing = False
+        duration_spinbox.setValue(saved_duration)
         
         # Tinctureスロットの場合はキー割り当て更新
         if slot_config.get('is_tincture', False):
@@ -460,13 +472,33 @@ class FlaskTinctureTab(BaseTab):
         flask_type = widgets['flask_type'].currentText()
         
         if rarity == "Magic":
-            # Magicの場合は追加選択を非表示
-            widgets['detail_label'].hide()
-            widgets['detail'].hide()
-            widgets['base_label'].hide()
-            widgets['base'].hide()
-            # Magicフラスコのデフォルト持続時間を設定
-            widgets['duration'].setValue(self.flask_data_manager.get_magic_flask_duration(flask_type.lower()))
+            if flask_type == "Utility":
+                # Utility + Magicの場合はベースタイプ選択を表示
+                widgets['base_label'].hide()
+                widgets['base'].hide()
+                widgets['detail_label'].show()
+                widgets['detail_label'].setText("ベースタイプ:")
+                widgets['detail'].show()
+                
+                # ユーティリティベースタイプをdetailに設定
+                base_types = self.flask_data_manager.get_utility_base_types()
+                widgets['detail'].clear()
+                widgets['detail'].addItems(base_types)
+                
+                # 検索ヒントを設定
+                widgets['detail'].lineEdit().setPlaceholderText("タイプして検索...")
+                
+                # 最初のアイテムが選択された場合の持続時間を設定
+                if base_types:
+                    self.on_detail_changed(slot_num, base_types[0])
+            else:
+                # その他のMagicフラスコ
+                widgets['detail_label'].hide()
+                widgets['detail'].hide()
+                widgets['base_label'].hide()
+                widgets['base'].hide()
+                # Magicフラスコのデフォルト持続時間を設定
+                widgets['duration'].setValue(self.flask_data_manager.get_magic_flask_duration(flask_type.lower()))
         else:  # Unique
             if flask_type == "Utility":
                 # Utility+Uniqueの場合はベース選択を表示
@@ -507,19 +539,31 @@ class FlaskTinctureTab(BaseTab):
         """詳細選択変更時の処理"""
         widgets = self.flask_slot_widgets[slot_num]
         flask_type = widgets['flask_type'].currentText()
+        rarity = widgets['rarity'].currentText()
         
         if not detail:
             return
         
-        # 持続時間を自動設定
-        if flask_type == "Utility":
-            base = widgets['base'].currentText()
-            duration = self.flask_data_manager.get_flask_duration("utility", detail, base)
-        else:
-            duration = self.flask_data_manager.get_flask_duration(flask_type.lower(), detail)
+        # 初期化中は持続時間を自動設定しない
+        if self.is_initializing:
+            return
         
-        if duration is not None:
-            widgets['duration'].setValue(duration)
+        # 現在の持続時間を取得
+        current_duration = widgets['duration'].value()
+        
+        # FlaskDataManagerから推奨持続時間を取得
+        if flask_type == "Utility" and rarity == "Magic":
+            # Utility + Magicの場合はベースタイプとして扱う
+            recommended_duration = self.flask_data_manager.get_utility_base_duration(detail)
+        elif flask_type == "Utility":
+            base = widgets['base'].currentText()
+            recommended_duration = self.flask_data_manager.get_flask_duration("utility", detail, base)
+        else:
+            recommended_duration = self.flask_data_manager.get_flask_duration(flask_type.lower(), detail)
+        
+        # 初回設定時（デフォルト値5.0）の場合のみ自動設定
+        if recommended_duration is not None and current_duration == 5.0:
+            widgets['duration'].setValue(recommended_duration)
     
     def on_experienced_herbalist_changed(self, state):
         """Experienced Herbalistチェックボックスの状態変更時の処理"""
