@@ -161,13 +161,27 @@ class FlaskTinctureTab(BaseTab):
         slot_widgets['rarity'] = rarity_combo
         layout.addWidget(rarity_combo, 2, 1, 1, 2)
         
-        # ユーティリティベース選択（Utility+Uniqueの場合のみ表示）
+        # ★順序変更：詳細プルダウン（ユニーク名/ベースタイプ）を先に（行3）
+        detail_label = QLabel("詳細:")
+        layout.addWidget(detail_label, 3, 0)  # 行3に移動
+        slot_widgets['detail_label'] = detail_label
+        detail_label.hide()
+        
+        # ★ ここが重要：SearchableComboBoxを使用
+        from src.gui.widgets.searchable_combobox import SearchableComboBox
+        detail_combo = SearchableComboBox()  # QComboBox()ではなくSearchableComboBox()
+        detail_combo.currentTextChanged.connect(lambda text: self.on_detail_changed(slot_num, text))
+        detail_combo.hide()
+        slot_widgets['detail'] = detail_combo
+        layout.addWidget(detail_combo, 3, 1, 1, 2)  # 行3に移動
+        
+        # ★順序変更：ユーティリティベース選択を後に（行4）
         base_label = QLabel("ベース:")
-        layout.addWidget(base_label, 3, 0)
+        layout.addWidget(base_label, 4, 0)  # 行4に移動
         slot_widgets['base_label'] = base_label
         base_label.hide()  # 初期状態では非表示
         
-        base_combo = QComboBox()
+        base_combo = SearchableComboBox()  # SearchableComboBoxに変更
         base_combo.addItems(self.flask_data_manager.get_utility_bases())
         # 保存された値を設定
         saved_base = slot_config.get('base', '')
@@ -178,21 +192,7 @@ class FlaskTinctureTab(BaseTab):
         base_combo.currentTextChanged.connect(lambda text: self.on_base_changed(slot_num, text))
         base_combo.hide()  # 初期状態では非表示
         slot_widgets['base'] = base_combo
-        layout.addWidget(base_combo, 3, 1, 1, 2)
-        
-        # 詳細プルダウン（動的に表示/非表示）
-        detail_label = QLabel("詳細:")
-        layout.addWidget(detail_label, 4, 0)
-        slot_widgets['detail_label'] = detail_label
-        detail_label.hide()  # 初期状態では非表示
-        
-        # ★ ここが重要：SearchableComboBoxを使用
-        from src.gui.widgets.searchable_combobox import SearchableComboBox
-        detail_combo = SearchableComboBox()  # QComboBox()ではなくSearchableComboBox()
-        detail_combo.currentTextChanged.connect(lambda text: self.on_detail_changed(slot_num, text))
-        detail_combo.hide()  # 初期状態では非表示
-        slot_widgets['detail'] = detail_combo
-        layout.addWidget(detail_combo, 4, 1, 1, 2)
+        layout.addWidget(base_combo, 4, 1, 1, 2)  # 行4に移動
         # 保存された詳細値は後で設定（プルダウンが更新された後）
         
         # 持続時間入力
@@ -483,13 +483,11 @@ class FlaskTinctureTab(BaseTab):
                 widgets['base_label'].hide()
                 widgets['base'].hide()
                 widgets['detail_label'].show()
-                widgets['detail_label'].setText("ベースタイプ:")
+                widgets['detail_label'].setText("ベースタイプ:")  # Magicの場合はベースタイプ
                 widgets['detail'].show()
                 
                 # ユーティリティベースタイプをdetailに設定
                 base_types = self.flask_data_manager.get_utility_base_types()
-                print(f"[DEBUG] base_types: {base_types}")  # デバッグログ
-                
                 widgets['detail'].clear()
                 widgets['detail'].addItems(base_types)
                 
@@ -510,39 +508,55 @@ class FlaskTinctureTab(BaseTab):
                 widgets['duration'].setValue(self.flask_data_manager.get_magic_flask_duration(flask_type.lower()))
         else:  # Unique
             if flask_type == "Utility":
-                # Utility+Uniqueの場合はベース選択を表示
-                widgets['base_label'].show()
-                widgets['base'].show()
+                # Utility+Uniqueの場合：ユニーク名を先に選択、ベースは自動設定
                 widgets['detail_label'].show()
+                widgets['detail_label'].setText("ユニーク名:")  # ★ラベルを変更
                 widgets['detail'].show()
-                # ベース選択を更新
-                self.on_base_changed(slot_num, widgets['base'].currentText())
+                
+                # すべてのユーティリティユニークフラスコを表示
+                unique_flasks = self.flask_data_manager.get_all_utility_uniques()
+                widgets['detail'].clear()
+                widgets['detail'].addItems(unique_flasks)
+                
+                # 検索ヒントを設定
+                if hasattr(widgets['detail'], 'lineEdit'):
+                    widgets['detail'].lineEdit().setPlaceholderText("ユニーク名を検索...")
+                
+                # ベースラベルは表示するが、ユーザーは選択不可（自動設定）
+                widgets['base_label'].show()
+                widgets['base_label'].setText("ベース（自動）:")
+                widgets['base'].show()
+                widgets['base'].setEnabled(False)  # 自動設定なので無効化
+                
+                # 最初のアイテムが選択された場合の処理
+                if unique_flasks:
+                    self.on_detail_changed(slot_num, unique_flasks[0])
             else:
-                # その他のUnique
+                # その他のUnique（Life, Mana, Hybrid）
                 widgets['base_label'].hide()
                 widgets['base'].hide()
                 widgets['detail_label'].show()
+                widgets['detail_label'].setText("ユニーク名:")  # ★ラベルを変更
                 widgets['detail'].show()
+                
                 # フラスコタイプに応じたユニーク名をdetailに設定
                 unique_flasks = self.flask_data_manager.get_unique_flasks(flask_type.lower())
                 widgets['detail'].clear()
                 widgets['detail'].addItems(unique_flasks)
+                
+                # 検索ヒントを設定
+                if hasattr(widgets['detail'], 'lineEdit'):
+                    widgets['detail'].lineEdit().setPlaceholderText("ユニーク名を検索...")
+                
                 # 最初のアイテムが選択された場合の持続時間を設定
                 if unique_flasks:
                     self.on_detail_changed(slot_num, unique_flasks[0])
     
     def on_base_changed(self, slot_num, base):
-        """ベース変更時の処理（Utility+Uniqueの場合）"""
-        widgets = self.flask_slot_widgets[slot_num]
-        
-        # ベースに応じたユニークフラスコを取得
-        utility_flasks = self.flask_data_manager.get_utility_flasks_by_base(base)
-        widgets['detail'].clear()
-        widgets['detail'].addItems(utility_flasks)
-        
-        # 最初のアイテムが選択された場合の持続時間を設定
-        if utility_flasks:
-            self.on_detail_changed(slot_num, utility_flasks[0])
+        """ベース変更時の処理（Utility+Uniqueでは使用されない）"""
+        # Utility+Uniqueの場合はベースが自動設定されるため、この処理は不要
+        # 将来の拡張のために残しておく
+        pass
     
     def on_detail_changed(self, slot_num, detail):
         """詳細選択変更時の処理"""
@@ -553,26 +567,29 @@ class FlaskTinctureTab(BaseTab):
         if not detail:
             return
         
-        # 初期化中は持続時間を自動設定しない
-        if self.is_initializing:
-            return
-        
-        # 現在の持続時間を取得
-        current_duration = widgets['duration'].value()
-        
-        # FlaskDataManagerから推奨持続時間を取得
-        if flask_type == "Utility" and rarity == "Magic":
-            # Utility + Magicの場合はベースタイプとして扱う
-            recommended_duration = self.flask_data_manager.get_utility_base_duration(detail)
-        elif flask_type == "Utility":
-            base = widgets['base'].currentText()
-            recommended_duration = self.flask_data_manager.get_flask_duration("utility", detail, base)
+        # Utility + Uniqueの場合、選択されたユニーク名からベースを自動設定
+        if flask_type == "Utility" and rarity == "Unique":
+            base = self.flask_data_manager.get_base_for_utility_unique(detail)
+            if base:
+                # ベースを自動設定（ユーザーは変更不可）
+                widgets['base'].clear()
+                widgets['base'].addItem(base)
+                widgets['base'].setCurrentText(base)
+                
+                # 持続時間を取得
+                duration = self.flask_data_manager.get_flask_duration("utility", detail, base)
+                if duration is not None:
+                    widgets['duration'].setValue(duration)
+        elif flask_type == "Utility" and rarity == "Magic":
+            # Magicユーティリティの場合はベースタイプから持続時間を取得
+            duration = self.flask_data_manager.get_utility_base_duration(detail)
+            if duration is not None:
+                widgets['duration'].setValue(duration)
         else:
-            recommended_duration = self.flask_data_manager.get_flask_duration(flask_type.lower(), detail)
-        
-        # 初回設定時（デフォルト値5.0）の場合のみ自動設定
-        if recommended_duration is not None and current_duration == 5.0:
-            widgets['duration'].setValue(recommended_duration)
+            # その他のフラスコ
+            duration = self.flask_data_manager.get_flask_duration(flask_type.lower(), detail)
+            if duration is not None:
+                widgets['duration'].setValue(duration)
     
     def on_experienced_herbalist_changed(self, state):
         """Experienced Herbalistチェックボックスの状態変更時の処理"""

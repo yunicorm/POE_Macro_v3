@@ -289,3 +289,35 @@ class FlaskDataManager:
                     return None
         
         return None
+    
+    def get_base_for_utility_unique(self, unique_name: str) -> Optional[str]:
+        """
+        ユーティリティユニークフラスコのベースタイプを取得
+        
+        Args:
+            unique_name: ユニークフラスコ名
+            
+        Returns:
+            ベースタイプ名、見つからない場合はNone
+        """
+        if "utility_unique" not in self.flask_data:
+            return None
+        
+        for item in self.flask_data["utility_unique"]:
+            if item.get('name', '') == unique_name:
+                return item.get('base', '')
+        
+        return None
+    
+    def get_all_utility_uniques(self) -> List[str]:
+        """
+        すべてのユーティリティユニークフラスコ名を取得（ベース関係なく）
+        
+        Returns:
+            ユニークフラスコ名のリスト（アルファベット順）
+        """
+        if "utility_unique" not in self.flask_data:
+            return []
+        
+        names = [item.get('name', '') for item in self.flask_data["utility_unique"] if item.get('name')]
+        return sorted(names)
