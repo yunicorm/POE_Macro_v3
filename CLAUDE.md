@@ -1363,3 +1363,194 @@ overlay:
 - 📊 **詳細ログ**: デバッグ・トラブルシューティング支援
 
 この実装により、POE Macro v3.0にプロフェッショナルレベルの視覚的フィードバック機能が追加され、ユーザーの利便性が大幅に向上しました。
+
+## 2025-07-05 ステータスオーバーレイドラッグ機能修正完了
+
+### 🚨 **ドラッグ機能問題の根本解決**
+
+#### **発見された問題**
+- オーバーレイが表示されるが、ドラッグで移動できない
+- マウスオーバーしてもカーソルが変わらない
+- `WindowTransparentForInput`フラグの頻繁な変更がドラッグ操作を妨害
+
+#### **問題の根本原因**
+- **フラグ操作の不安定性**: `setWindowFlags()` + `show()` の頻繁な呼び出し
+- **イベント処理の干渉**: フラグ変更時にウィンドウが再作成されイベントが失われる
+- **透過制御の複雑性**: タイマーベースの遅延処理が予期しない動作を引き起こす
+
+### 🔧 **実装した根本的修正**
+
+#### **1. 安定したマウスイベント制御への変更**
+
+**修正前（問題のあった実装）:**
+```python
+# 問題: WindowTransparentForInputの頻繁な変更
+def enterEvent(self, event):
+    self.setWindowFlags(
+        Qt.WindowStaysOnTopHint |
+        Qt.FramelessWindowHint |
+        Qt.Tool
+    )
+    self.show()  # ←これが問題：ウィンドウの再作成
+```
+
+**修正後（安定した実装）:**
+```python
+# 解決: WA_TransparentForMouseEventsの使用
+def init_ui(self):
+    # シンプルなフラグ設定（初期化時のみ）
+    self.setWindowFlags(
+        Qt.WindowStaysOnTopHint |
+        Qt.FramelessWindowHint |
+        Qt.Tool
+    )
+    # マウスイベント透過を属性で制御
+    self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+def enterEvent(self, event):
+    # 安定したイベント受信を有効化
+    self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+    self.setCursor(Qt.OpenHandCursor)
+```
+
+#### **2. 詳細デバッグログシステムの実装**
+
+```python
+def enterEvent(self, event):
+    self.logger.debug("[ENTER] enterEvent triggered")
+    # ... 詳細な状態ログ
+
+def mousePressEvent(self, event):
+    self.logger.debug(f"[PRESS] mousePressEvent triggered, button: {event.button()}")
+    self.logger.debug(f"[PRESS] Drag started at global: {event.globalPos()}")
+    # ... ドラッグ開始の詳細追跡
+
+def mouseMoveEvent(self, event):
+    self.logger.debug(f"[MOVE] Dragging - Global: {event.globalPos()}, New pos: {new_pos}")
+    # ... リアルタイム移動追跡
+```
+
+#### **3. 設定ファイル自動保存の改善**
+
+```python
+# 位置変更時の自動保存
+def mouseReleaseEvent(self, event):
+    if event.button() == Qt.LeftButton and self.is_dragging:
+        self.is_dragging = False
+        # 位置を即座に保存
+        self.save_settings()
+        # ドラッグ終了時の適切な状態復元
+```
+
+**新しい設定ファイル構造 (config/overlay_settings.yaml):**
+```yaml
+status_overlay:
+  x: 561          # ユーザーが実際にドラッグした位置
+  y: 1239         # ユーザーが実際にドラッグした位置
+  width: 150
+  height: 40
+  opacity: 0.8
+  font_size: 16
+  always_on_top: true
+  click_through: true
+  visible: true
+```
+
+### 🧪 **問題解決のためのテストツール**
+
+#### **シンプルテストスクリプト (test_drag_simple.py)**
+```python
+# 問題の切り分けに特化したテストツール
+# - 基本的なドラッグ機能のテスト
+# - リアルタイムログ表示
+# - 段階的な動作確認
+# - デバッグ情報の詳細表示
+```
+
+**テスト手順:**
+1. オーバーレイ作成
+2. マウスホバー（カーソル変化確認）
+3. ドラッグ操作（移動確認）
+4. ログでイベント発生確認
+
+### 📊 **修正前後の比較**
+
+| 項目 | **修正前（問題あり）** | **修正後（安定）** |
+|------|---------------------|------------------|
+| **透過制御** | WindowTransparentForInput | **WA_TransparentForMouseEvents** |
+| **フラグ変更** | enterEvent毎に実行 | **初期化時のみ** |
+| **show()呼び出し** | イベント毎に実行 | **初期化時のみ** |
+| **ドラッグ安定性** | ❌ 不安定・移動不可 | **✅ 安定・スムーズ移動** |
+| **カーソル変化** | ❌ 変化しない | **✅ 正常に変化** |
+| **デバッグ性** | ❌ 限定的ログ | **✅ 詳細ログ完備** |
+| **設定保存** | ❌ 不安定 | **✅ 確実に保存** |
+
+### 🎯 **修正効果の確認**
+
+#### **動作テスト結果**
+- ✅ **オーバーレイ表示**: 正常（赤い「マクロオフ」表示）
+- ✅ **マウスホバー**: カーソルがオープンハンドに変化
+- ✅ **ドラッグ開始**: カーソルがクローズハンドに変化
+- ✅ **ドラッグ移動**: スムーズな移動（X:561, Y:1239に移動確認済み）
+- ✅ **位置保存**: config/overlay_settings.yamlに自動保存
+- ✅ **透過復元**: ドラッグ終了後にクリック透過が正常に復元
+
+#### **実際の設定保存確認**
+```yaml
+# ユーザーがドラッグした結果がconfig/overlay_settings.yamlに保存されている
+status_overlay:
+  x: 561     # ← ドラッグ後の新しい位置
+  y: 1239    # ← ドラッグ後の新しい位置
+```
+
+### 🛠️ **技術的改善ポイント**
+
+#### **1. イベント処理の安定化**
+- ウィンドウフラグの変更を最小化
+- 属性ベースのマウスイベント制御
+- タイマーの使用を削減
+
+#### **2. デバッグ性の向上**
+- 全イベントハンドラーに詳細ログ
+- ドラッグ操作の段階別追跡
+- 設定保存の確認ログ
+
+#### **3. 設定管理の堅牢化**
+- 専用設定ファイル (overlay_settings.yaml)
+- 即座の設定保存
+- エラー耐性の向上
+
+### ✅ **修正完了状況**
+
+- [x] **ドラッグ機能**: 完全に動作（X:561, Y:1239への移動確認済み）
+- [x] **カーソル変化**: オープンハンド/クローズハンドが正常動作
+- [x] **設定保存**: ドラッグ終了時に自動保存が正常動作
+- [x] **透過制御**: クリック透過の正常な切り替え
+- [x] **デバッグログ**: 詳細なイベント追跡機能
+- [x] **構文チェック**: 全ファイル合格
+- [x] **テストツール**: 問題切り分け用テストスクリプト完備
+
+### 🎮 **ユーザー操作ガイド（修正版）**
+
+1. **初期表示**: 半透明オーバーレイが表示（クリック透過）
+2. **マウスホバー**: カーソルがオープンハンドに変化
+3. **ドラッグ開始**: 左クリック押下でクローズハンドに変化
+4. **移動**: マウス移動でリアルタイムに位置更新
+5. **ドラッグ終了**: 左クリック解除で位置が自動保存
+6. **透過復元**: マウスがウィンドウ外に出ると透過状態に戻る
+
+### 🔧 **技術的な教訓**
+
+#### **問題解決のアプローチ**
+1. **段階的デバッグ**: 詳細ログで問題箇所を特定
+2. **代替実装**: WindowTransparentForInput → WA_TransparentForMouseEvents
+3. **シンプル化**: 複雑なタイマー処理を削除
+4. **テスト駆動**: 問題切り分け専用のテストツール作成
+
+#### **今後の開発での注意点**
+- PyQt5のウィンドウフラグ変更は最小限に抑える
+- マウスイベント制御は属性ベースを優先
+- デバッグログは開発初期から実装
+- ユーザー操作は即座にフィードバックを提供
+
+この修正により、ステータスオーバーレイのドラッグ機能は完全に動作し、ユーザーが自由に位置をカスタマイズできる安定したシステムが完成しました。

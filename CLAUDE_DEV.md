@@ -1,4 +1,23 @@
-# POE Macro v3.0 開発ガイドライン
+# POE Macro v3.0 - 開発ノート
+
+## プロジェクト概要
+Path of Exile自動化マクロ v3.0の詳細な開発記録とトラブルシューティング情報
+
+## 📋 **最新の開発状況（2025-07-05）**
+
+### 🎯 **ステータスオーバーレイドラッグ機能修正完了**
+
+## 📋 **問題と解決アプローチ**
+
+### **2025-07-05 最新修正: ステータスオーバーレイドラッグ機能**
+
+**問題**: ステータスオーバーレイのドラッグ機能が動作しない
+**解決**: `WindowTransparentForInput` → `WA_TransparentForMouseEvents` への変更
+
+#### **動作確認結果**
+- ✅ **実際のドラッグ移動**: X:561, Y:1239への移動成功
+- ✅ **設定保存**: config/overlay_settings.yamlに自動保存確認
+- ✅ **カーソル変化**: オープンハンド/クローズハンドが正常動作
 
 ## 関連ドキュメント
 
@@ -7,6 +26,58 @@
 - **[要件定義書](docs/POE_Macro_v3_要件定義書.md)**: プロジェクトの詳細な要件と仕様
 - **[開発計画書](docs/POE_Macro_v3_開発計画書.md)**: 開発フェーズとタスクの詳細
 - **[開発記録](CLAUDE.md)**: 日々の開発進捗と技術的決定事項
+
+---
+
+## 🚨 **重要な技術的問題と解決策**
+
+### **問題1: ステータスオーバーレイのドラッグ不可**
+
+#### **症状**
+- オーバーレイは表示されるが、マウスでドラッグできない
+- カーソルがオープンハンドに変わらない
+- 初期位置（1720, 1050）に固定される
+
+#### **根本原因**
+```python
+# 問題のあったコード
+def enterEvent(self, event):
+    self.setWindowFlags(
+        Qt.WindowStaysOnTopHint |
+        Qt.FramelessWindowHint |
+        Qt.Tool
+    )
+    self.show()  # ←問題：ウィンドウの再作成でイベントが失われる
+```
+
+#### **解決策**
+```python
+# 修正後のコード
+def init_ui(self):
+    # フラグは初期化時のみ設定
+    self.setWindowFlags(
+        Qt.WindowStaysOnTopHint |
+        Qt.FramelessWindowHint |
+        Qt.Tool
+    )
+    # 属性ベースの透過制御
+    self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+def enterEvent(self, event):
+    # 安定したイベント制御
+    self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+    self.setCursor(Qt.OpenHandCursor)
+```
+
+#### **技術的教訓**
+- PyQt5で`setWindowFlags()`を頻繁に呼ぶとウィンドウが再作成される
+- `WA_TransparentForMouseEvents`は`WindowTransparentForInput`より安定
+- イベントハンドラー内でのウィンドウ再作成は避ける
+
+#### **動作確認結果**
+- ✅ **ドラッグ移動**: X:561, Y:1239への移動確認済み
+- ✅ **設定保存**: config/overlay_settings.yamlに自動保存
+- ✅ **カーソル変化**: オープンハンド/クローズハンドが正常動作
 
 特に要件定義書は、各モジュールの具体的な動作仕様（タイミング、キー割り当て、画像認識の詳細など）が記載されているため、実装時に必ず参照してください。
 

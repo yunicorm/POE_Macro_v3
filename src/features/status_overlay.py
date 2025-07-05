@@ -48,16 +48,18 @@ class StatusOverlay(QWidget):
         
     def init_ui(self):
         """UIの初期化"""
-        # ウィンドウフラグ設定
+        # ウィンドウフラグ設定（シンプルな設定）
         self.setWindowFlags(
             Qt.WindowStaysOnTopHint |      # 常に最前面
             Qt.FramelessWindowHint |       # フレームなし
-            Qt.Tool |                      # タスクバーに表示しない
-            Qt.WindowTransparentForInput   # マウスクリック透過（初期状態）
+            Qt.Tool                        # タスクバーに表示しない
         )
         
         # 背景を半透明に
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        
+        # 初期状態ではマウスイベントを透過
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         
         # ウィンドウサイズ
         self.setFixedSize(self.overlay_width, self.overlay_height)
@@ -76,6 +78,8 @@ class StatusOverlay(QWidget):
         self.customContextMenuRequested.connect(self.show_context_menu)
         
         self.logger.info("ステータスオーバーレイを初期化しました")
+        self.logger.debug(f"[INIT] Initial flags: {self.windowFlags()}")
+        self.logger.debug(f"[INIT] Transparent for mouse events: {self.testAttribute(Qt.WA_TransparentForMouseEvents)}")
         
     def set_macro_status(self, is_on: bool):
         """マクロの状態を設定"""
@@ -113,81 +117,100 @@ class StatusOverlay(QWidget):
         painter.drawText(self.rect(), Qt.AlignCenter, status_text)
         
     def enterEvent(self, event):
-        """マウスがウィンドウに入った時（ドラッグ準備）"""
+        """マウスオーバー時の処理を簡素化"""
+        self.logger.debug("[ENTER] enterEvent triggered")
         self.hover_active = True
-        # マウスオーバー時にクリック透過を一時解除
-        self.setWindowFlags(
-            Qt.WindowStaysOnTopHint |
-            Qt.FramelessWindowHint |
-            Qt.Tool
-        )
-        self.show()
+        
+        # マウスイベントの透過を無効化（ドラッグを可能に）
+        was_transparent = self.testAttribute(Qt.WA_TransparentForMouseEvents)
+        self.logger.debug(f"[ENTER] Was transparent: {was_transparent}")
+        
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
         self.setCursor(Qt.OpenHandCursor)
+        
+        self.logger.debug("[ENTER] Mouse events enabled, cursor set to OpenHandCursor")
+        
         # ドラッグ中は境界線を強調
         self.update()
+        self.logger.debug("[ENTER] Update called")
         
     def leaveEvent(self, event):
-        """マウスがウィンドウから出た時（ドラッグ終了）"""
+        """マウスアウト時の処理"""
+        self.logger.debug(f"[LEAVE] leaveEvent triggered, is_dragging: {self.is_dragging}")
         self.hover_active = False
+        
         if not self.is_dragging:
             # ドラッグ中でない場合のみクリック透過を再設定
             self.setCursor(Qt.ArrowCursor)
-            # leaveEventでは即座に透過を設定せず、タイマーで遅延実行
-            QTimer.singleShot(100, self._reset_transparency)
+            self.logger.debug("[LEAVE] Cursor set to ArrowCursor")
+            
+            # 遅延なしで直接設定
+            self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            self.logger.debug("[LEAVE] Mouse events disabled (transparent)")
+        
         self.update()
+        self.logger.debug("[LEAVE] Update called")
         
     def mousePressEvent(self, event):
         """マウス押下イベント（ドラッグ開始）"""
+        self.logger.debug(f"[PRESS] mousePressEvent triggered, button: {event.button()}")
+        
         if event.button() == Qt.LeftButton:
             self.is_dragging = True
             self.drag_start_pos = event.globalPos() - self.pos()
             self.setCursor(Qt.ClosedHandCursor)
             
+            self.logger.debug(f"[PRESS] Drag started at global: {event.globalPos()}, widget: {self.pos()}")
+            self.logger.debug(f"[PRESS] Drag start pos: {self.drag_start_pos}")
+            self.logger.debug(f"[PRESS] is_dragging set to: {self.is_dragging}")
+            
     def mouseMoveEvent(self, event):
         """マウス移動イベント（ドラッグ中）"""
         if self.is_dragging and event.buttons() == Qt.LeftButton:
             new_pos = event.globalPos() - self.drag_start_pos
+            
+            self.logger.debug(f"[MOVE] Dragging - Global: {event.globalPos()}, New pos: {new_pos}")
+            
             self.move(new_pos)
             self.overlay_x = new_pos.x()
             self.overlay_y = new_pos.y()
+            
+            self.logger.debug(f"[MOVE] Moved to: X={self.overlay_x}, Y={self.overlay_y}")
+            
             self.position_changed.emit(self.overlay_x, self.overlay_y)
+        elif self.is_dragging:
+            self.logger.debug(f"[MOVE] Dragging but wrong button state: {event.buttons()}")
             
     def mouseReleaseEvent(self, event):
         """マウスリリースイベント（ドラッグ終了）"""
+        self.logger.debug(f"[RELEASE] mouseReleaseEvent triggered, button: {event.button()}, is_dragging: {self.is_dragging}")
+        
         if event.button() == Qt.LeftButton and self.is_dragging:
             self.is_dragging = False
-            self.setCursor(Qt.OpenHandCursor)  # ArrowCursorではなくOpenHandCursorを維持
+            self.setCursor(Qt.OpenHandCursor)  # OpenHandCursorを維持
+            
+            self.logger.debug(f"[RELEASE] Drag ended at position: X={self.overlay_x}, Y={self.overlay_y}")
             
             # 位置を保存
             self.save_settings()
             
-            # マウスがまだウィンドウ上にある場合は透過を設定しない
-            if not self.rect().contains(self.mapFromGlobal(event.globalPos())):
-                # 少し遅延してからクリック透過を再設定
-                QTimer.singleShot(200, self._reset_transparency)
+            # マウスがまだウィンドウ上にあるかチェック
+            mouse_in_widget = self.rect().contains(self.mapFromGlobal(event.globalPos()))
+            self.logger.debug(f"[RELEASE] Mouse in widget: {mouse_in_widget}")
+            
+            if not mouse_in_widget:
+                # マウスがウィンドウ外に移動した場合は透過を設定
+                self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                self.setCursor(Qt.ArrowCursor)
+                self.logger.debug("[RELEASE] Mouse events disabled (transparent)")
             
             self.update()  # 再描画で境界線を戸して更新
             
     def _reset_transparency(self):
-        """クリック透過の再設定"""
-        # ドラッグ中でない場合のみ透過を設定
-        if not self.is_dragging and not self.hover_active:
-            # マウスがウィンドウ上にあるかチェック
-            global_pos = QCursor.pos()
-            local_pos = self.mapFromGlobal(global_pos)
-            
-            # マウスがウィンドウ外にある場合のみ透過を設定
-            if not self.rect().contains(local_pos):
-                self.setWindowFlags(
-                    Qt.WindowStaysOnTopHint |
-                    Qt.FramelessWindowHint |
-                    Qt.Tool |
-                    Qt.WindowTransparentForInput
-                )
-                self.show()
-                self.setCursor(Qt.ArrowCursor)
-                self.logger.debug("Transparency reset: click-through enabled")
-                self.update()  # 再描画で境界線を戸して更新
+        """クリック透過の再設定（新しい実装では使用しない）"""
+        # このメソッドは新しい実装では使用しないが、互換性のために保持
+        self.logger.debug("[RESET] _reset_transparency called (not used in new implementation)")
+        pass
         
     def save_position(self):
         """現在位置を保存"""
