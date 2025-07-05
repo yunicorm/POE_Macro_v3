@@ -117,6 +117,7 @@ class MacroController:
         # グローバルホットキーリスナー
         self.hotkey_listener = None
         self.toggle_listener = None  # F12トグル用リスナー
+        self.alt_toggle_listener = None  # 代替トグル用リスナー
         self.input_listener = None  # Grace Period入力検知用リスナー
         
         # MainWindowとの同期用コールバック
@@ -124,6 +125,10 @@ class MacroController:
         
         # グローバルホットキーを設定（初期化時に設定）
         self._setup_global_hotkeys()
+        
+        # リスナー監視タイマー
+        self._listener_check_timer = None
+        self._start_listener_monitor()
         
         logger.info("MacroController initialized successfully")
         
@@ -308,12 +313,20 @@ class MacroController:
         if self.toggle_listener:
             self.toggle_listener.stop()
             self.toggle_listener = None
+        if self.alt_toggle_listener:
+            self.alt_toggle_listener.stop()
+            self.alt_toggle_listener = None
         if self.input_listener:
             self.input_listener.stop()
             self.input_listener = None
         if hasattr(self, 'mouse_listener') and self.mouse_listener:
             self.mouse_listener.stop()
             self.mouse_listener = None
+        
+        # リスナー監視タイマーの停止
+        if self._listener_check_timer:
+            self._listener_check_timer.cancel()
+            self._listener_check_timer = None
         
         # 待機状態をリセット
         self.waiting_for_input = False
@@ -433,7 +446,7 @@ class MacroController:
             }
     
     def _setup_global_hotkeys(self):
-        """ホットキーを設定（緊急停止: Ctrl+Shift+F12, トグル: F12）"""
+        """ホットキーを設定（緊急停止: Ctrl+Shift+F12, トグル: F12/F11/Pause）"""
         # 既存のリスナーを停止
         if self.hotkey_listener:
             self.hotkey_listener.stop()
@@ -441,6 +454,9 @@ class MacroController:
         if self.toggle_listener:
             self.toggle_listener.stop()
             self.toggle_listener = None
+        if self.alt_toggle_listener:
+            self.alt_toggle_listener.stop()
+            self.alt_toggle_listener = None
         
         # Ctrl+Shift+F12 緊急停止用
         def on_press_emergency(key):
@@ -478,29 +494,134 @@ class MacroController:
             except Exception as e:
                 logger.error(f"Error in key release handler: {e}")
         
-        # F12トグル用
+        # 複数トグルキー対応（F12, F11, Pause/Break）
         def on_press_toggle(key):
             try:
-                if key == pynput.keyboard.Key.f12:
-                    logger.info("Toggle triggered (F12)")
+                # デバッグログ: 検知したキーを記録
+                if hasattr(key, 'name'):
+                    key_name = key.name
+                elif hasattr(key, 'char'):
+                    key_name = f"'{key.char}'"
+                else:
+                    key_name = str(key)
+                
+                logger.debug(f"Key detected: {key_name}")
+                
+                # 複数のトグルキーに対応
+                toggle_keys = [
+                    pynput.keyboard.Key.f12,
+                    pynput.keyboard.Key.f11,
+                    pynput.keyboard.Key.pause  # Pause/Break キー
+                ]
+                
+                if key in toggle_keys:
+                    logger.info(f"Toggle triggered ({key_name})")
                     self.toggle()
+                
             except Exception as e:
                 logger.error(f"Error in toggle handler: {e}")
         
-        # 緊急停止リスナー
+        # より柔軟なキー検知のための追加処理
+        def on_press_alt_toggle(key):
+            """代替のキー検知方法（特殊キー用）"""
+            try:
+                # raw値による検知（仮想キー対応）
+                if hasattr(key, 'vk'):
+                    # F12のVKコード: 123, F11のVKコード: 122
+                    if key.vk in [123, 122, 19]:  # F12, F11, Pause
+                        key_names = {123: 'F12', 122: 'F11', 19: 'Pause'}
+                        logger.info(f"Alternative toggle triggered (VK {key.vk} = {key_names.get(key.vk, 'Unknown')})")
+                        self.toggle()
+                        # return文を削除してリスナーを継続動作させる
+                
+                # 文字キーによる代替検知
+                if hasattr(key, 'char') and key.char:
+                    # Ctrl+F でもトグル可能（デバッグ用）
+                    if key.char.lower() == 'f':
+                        current_keys = getattr(on_press_alt_toggle, 'current_keys', set())
+                        ctrl_pressed = any(k in current_keys for k in [pynput.keyboard.Key.ctrl_l, pynput.keyboard.Key.ctrl_r])
+                        if ctrl_pressed:
+                            logger.info("Toggle triggered (Ctrl+F)")
+                            self.toggle()
+                            
+            except Exception as e:
+                logger.error(f"Error in alternative toggle handler: {e}")
+        
+        # 緊急停止リスナー（suppress=False で仮想キーも検知）
         self.hotkey_listener = pynput.keyboard.Listener(
             on_press=on_press_emergency,
-            on_release=on_release_emergency
+            on_release=on_release_emergency,
+            suppress=False  # 仮想キー入力も検知
         )
         self.hotkey_listener.daemon = True
         self.hotkey_listener.start()
         
-        # トグルリスナー
-        self.toggle_listener = pynput.keyboard.Listener(on_press=on_press_toggle)
+        # メイントグルリスナー（suppress=False で仮想キーも検知）
+        self.toggle_listener = pynput.keyboard.Listener(
+            on_press=on_press_toggle,
+            suppress=False  # 仮想キー入力も検知
+        )
         self.toggle_listener.daemon = True
         self.toggle_listener.start()
         
-        logger.info("Hotkeys registered - Toggle: F12, Emergency stop: Ctrl+Shift+F12")
+        # 代替トグルリスナー（より低レベルな検知）
+        try:
+            self.alt_toggle_listener = pynput.keyboard.Listener(
+                on_press=on_press_alt_toggle,
+                suppress=False,
+                win32_event_filter=lambda msg, data: True  # Windowsイベントフィルターを無効化
+            )
+            self.alt_toggle_listener.daemon = True
+            self.alt_toggle_listener.start()
+            logger.info("Alternative toggle listener started")
+        except Exception as e:
+            logger.warning(f"Alternative toggle listener failed to start: {e}")
+        
+        logger.info("Hotkeys registered - Toggle: F12/F11/Pause/Ctrl+F, Emergency stop: Ctrl+Shift+F12")
+    
+    def _start_listener_monitor(self):
+        """リスナーの健全性を監視し、必要に応じて再起動"""
+        def check_listeners():
+            try:
+                # リスナーの状態をチェック
+                listeners_ok = True
+                
+                if self.toggle_listener and not self.toggle_listener.running:
+                    logger.warning("Toggle listener has stopped, restarting...")
+                    listeners_ok = False
+                
+                if self.alt_toggle_listener and not self.alt_toggle_listener.running:
+                    logger.warning("Alternative toggle listener has stopped, restarting...")
+                    listeners_ok = False
+                
+                if self.hotkey_listener and not self.hotkey_listener.running:
+                    logger.warning("Hotkey listener has stopped, restarting...")
+                    listeners_ok = False
+                
+                # リスナーが停止している場合は再起動
+                if not listeners_ok:
+                    logger.info("Restarting stopped listeners...")
+                    self._setup_global_hotkeys()
+                
+                # 次回チェックをスケジュール（10秒後）
+                if not self.emergency_stop:
+                    self._listener_check_timer = threading.Timer(10.0, check_listeners)
+                    self._listener_check_timer.daemon = True
+                    self._listener_check_timer.start()
+                    
+            except Exception as e:
+                logger.error(f"Error in listener monitor: {e}")
+                # エラーが発生してもチェックを継続
+                if not self.emergency_stop:
+                    self._listener_check_timer = threading.Timer(10.0, check_listeners)
+                    self._listener_check_timer.daemon = True
+                    self._listener_check_timer.start()
+        
+        # 初回チェックを10秒後に開始
+        self._listener_check_timer = threading.Timer(10.0, check_listeners)
+        self._listener_check_timer.daemon = True
+        self._listener_check_timer.start()
+        logger.debug("Listener monitor started")
     
     def _setup_input_listener(self):
         """Grace Period入力検知リスナーを設定"""
@@ -636,6 +757,22 @@ class MacroController:
         except Exception as e:
             logger.error(f"Error activating POE window: {e}")
             return False
+    
+    def restart_hotkey_listeners(self):
+        """ホットキーリスナーを手動で再起動"""
+        logger.info("Manually restarting hotkey listeners...")
+        self._setup_global_hotkeys()
+        logger.info("Hotkey listeners restarted")
+    
+    def get_listener_status(self) -> dict:
+        """リスナーの状態を取得"""
+        return {
+            'hotkey_listener': self.hotkey_listener.running if self.hotkey_listener else False,
+            'toggle_listener': self.toggle_listener.running if self.toggle_listener else False,
+            'alt_toggle_listener': self.alt_toggle_listener.running if self.alt_toggle_listener else False,
+            'input_listener': self.input_listener.running if self.input_listener else False,
+            'mouse_listener': self.mouse_listener.running if hasattr(self, 'mouse_listener') and self.mouse_listener else False
+        }
     
     def __enter__(self):
         """コンテキストマネージャーとして使用"""
