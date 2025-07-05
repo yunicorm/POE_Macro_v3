@@ -98,7 +98,6 @@ class LogMonitor:
         self.grace_period_active = False
         self.input_listeners = []
         self.current_area_needs_grace = False
-        self.grace_period_completed_areas = set()  # 一度入力を検知したエリアを記録
         
     def _find_client_log_path(self) -> str:
         """POE Client.txtファイルのパスを自動検出"""
@@ -282,15 +281,10 @@ class LogMonitor:
         if not self._is_safe_area(self.current_area):
             # Grace Period機能が有効かチェック
             if self.grace_period_enabled and self.wait_for_input:
-                # 一度入力を検知したエリアは即座に開始
-                area_id = f"{self.current_area}_{int(time.time() // 3600)}"  # 1時間ごとにリセット
-                if area_id in self.grace_period_completed_areas:
-                    logger.info(f"Area previously completed grace period, starting macro immediately: {self.current_area}")
-                    self._activate_macro()
-                else:
-                    logger.info(f"Entering grace period - waiting for player input...")
-                    self.current_area_needs_grace = True
-                    self._start_grace_period()
+                # 毎回入力待機（キャッシュ機能削除）
+                logger.info(f"Entering grace period - waiting for player input...")
+                self.current_area_needs_grace = True
+                self._start_grace_period()
             else:
                 self._activate_macro()
                 logger.info(f"Macro activated for area: {self.current_area}")
@@ -507,11 +501,6 @@ class LogMonitor:
             return
             
         logger.info(f"Player input detected ({input_type}) - starting macro")
-        
-        # 現在のエリアを完了済みとして記録
-        if self.current_area:
-            area_id = f"{self.current_area}_{int(time.time() // 3600)}"
-            self.grace_period_completed_areas.add(area_id)
         
         # Grace Period終了
         self._stop_grace_period()
