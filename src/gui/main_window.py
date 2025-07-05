@@ -10,8 +10,7 @@ from PyQt5.QtCore import Qt, QTimer
 # Tab imports
 from .tabs.log_tab import LogTab
 from .tabs.control_tab import ControlTab
-from .tabs.tincture_tab import TinctureTab
-from .tabs.flask_tab import FlaskTab
+from .tabs.flask_tincture_tab import FlaskTinctureTab
 from .tabs.skills_tab import SkillsTab
 from .tabs.calibration_tab import CalibrationTab
 from .utils.calibration_helpers import CalibrationHelpers
@@ -94,13 +93,10 @@ class MainWindow(QMainWindow):
         widget = control_tab.create_widget()
         self.tab_widget.addTab(widget, "一般")
         
-        tincture_tab = TinctureTab(self)
-        widget = tincture_tab.create_widget()
-        self.tab_widget.addTab(widget, "Tincture")
-        
-        flask_tab = FlaskTab(self)
-        widget = flask_tab.create_widget()
-        self.tab_widget.addTab(widget, "Flask")
+        # Flask&Tinctureタブ（統合版）
+        flask_tincture_tab = FlaskTinctureTab(self)
+        widget = flask_tincture_tab.create_widget()
+        self.tab_widget.addTab(widget, "Flask&Tincture")
         
         skills_tab = SkillsTab(self)
         widget = skills_tab.create_widget()
