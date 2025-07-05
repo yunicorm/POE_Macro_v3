@@ -108,3 +108,12 @@ log_monitor:
   enabled: true
   log_path: "C:/Program Files (x86)/Steam/steamapps/common/Path of Exile/logs/Client.txt"
   check_interval: 0.5
+
+# Status overlay settings
+overlay:
+  status_position:
+    x: 1720      # オーバーレイのX座標（フラスコエリア上部中央）
+    y: 1050      # オーバーレイのY座標（フラスコエリアの少し上）
+    width: 150   # オーバーレイの幅
+    height: 40   # オーバーレイの高さ
+  font_size: 16  # フォントサイズ設定（解像度に応じて調整可能）

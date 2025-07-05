@@ -123,6 +123,9 @@ class MacroController:
         # MainWindowとの同期用コールバック
         self.status_changed_callback = None
         
+        # ステータスオーバーレイ（GUIモード時のみ）
+        self.status_overlay = None
+        
         # グローバルホットキーを設定（初期化時に設定）
         self._setup_global_hotkeys()
         
@@ -340,6 +343,10 @@ class MacroController:
         """MainWindowとの同期用コールバックを設定"""
         self.status_changed_callback = callback
     
+    def set_status_overlay(self, overlay):
+        """ステータスオーバーレイを設定"""
+        self.status_overlay = overlay
+    
     def _notify_status_changed(self):
         """ステータス変更をMainWindowに通知"""
         if self.status_changed_callback:
@@ -347,6 +354,13 @@ class MacroController:
                 self.status_changed_callback(self.running)
             except Exception as e:
                 logger.error(f"Error in status change callback: {e}")
+        
+        # ステータスオーバーレイも更新
+        if self.status_overlay:
+            try:
+                self.status_overlay.set_macro_status(self.running)
+            except Exception as e:
+                logger.error(f"Error updating status overlay: {e}")
     
     def restart(self):
         """全マクロモジュールを再起動"""
@@ -499,9 +513,15 @@ class MacroController:
                     if self.running:
                         logger.info(f"Macro stopped by F12")
                         self.stop()
+                        # オーバーレイ更新確認
+                        if self.status_overlay:
+                            logger.debug("F12: Status overlay updated to OFF")
                     else:
                         logger.info(f"Macro started by F12")
                         self.start()
+                        # オーバーレイ更新確認
+                        if self.status_overlay:
+                            logger.debug("F12: Status overlay updated to ON")
                     # return False を削除 - リスナーを継続させる
                 
             except Exception as e:

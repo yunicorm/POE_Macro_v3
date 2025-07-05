@@ -1013,6 +1013,10 @@ class MainWindow(QMainWindow):
                 if success is not False:  # None or True
                     self.statusBar().showMessage("マクロ実行中")
                     self.log_message("マクロを開始しました - FAST")
+                    
+                    # ステータスオーバーレイを更新
+                    if hasattr(self.macro_controller, 'status_overlay') and self.macro_controller.status_overlay:
+                        self.macro_controller.status_overlay.set_macro_status(True)
                 else:
                     # 開始失敗時のロールバック
                     self.start_btn.setEnabled(True)
@@ -1044,6 +1048,10 @@ class MainWindow(QMainWindow):
             
             if self.macro_controller:
                 self.macro_controller.stop()
+                
+                # ステータスオーバーレイを更新
+                if hasattr(self.macro_controller, 'status_overlay') and self.macro_controller.status_overlay:
+                    self.macro_controller.status_overlay.set_macro_status(False)
             
             # 最終状態に更新
             self.statusBar().showMessage("Ready")

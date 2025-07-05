@@ -162,19 +162,55 @@ def run_headless(macro_controller):
         return 1
 
 def run_gui(config_manager, macro_controller):
-    """GUIモードで実行"""
+    """GUIモードで実行（修正版）"""
     logger = logging.getLogger(__name__)
     
     try:
         # GUI アプリケーションの準備
         app = QApplication(sys.argv)
         
+        # ステータスオーバーレイを作成（設定から位置を読み込む）
+        from src.features.status_overlay import StatusOverlay
+        overlay_config = config_manager.config.get('overlay', {}).get('status_position', {})
+        font_size = config_manager.config.get('overlay', {}).get('font_size', 16)
+        
+        status_overlay = StatusOverlay(font_size=font_size)
+        if overlay_config:
+            status_overlay.load_position(
+                overlay_config.get('x', 1720),
+                overlay_config.get('y', 1050)
+            )
+        
+        # 位置変更時の自動保存機能
+        def on_position_changed(x, y):
+            try:
+                if 'overlay' not in config_manager.config:
+                    config_manager.config['overlay'] = {}
+                if 'status_position' not in config_manager.config['overlay']:
+                    config_manager.config['overlay']['status_position'] = {}
+                
+                config_manager.config['overlay']['status_position']['x'] = x
+                config_manager.config['overlay']['status_position']['y'] = y
+                config_manager.save_config(config_manager.config)
+                logger.info(f"オーバーレイ位置を保存しました: X={x}, Y={y}")
+            except Exception as e:
+                logger.error(f"オーバーレイ位置保存エラー: {e}")
+        
+        status_overlay.position_changed.connect(on_position_changed)
+        status_overlay.show()
+        
+        # MacroControllerにオーバーレイを設定
+        macro_controller.set_status_overlay(status_overlay)
+        
         # MainWindowを起動
         from gui.main_window import MainWindow
         main_window = MainWindow(config_manager, macro_controller)
         main_window.show()
         
-        logger.info("POE Macro v3.0 started successfully!")
+        # 初期状態を設定（マクロオフ）
+        status_overlay.set_macro_status(False)
+        
+        logger.info("POE Macro v3.0 started successfully with status overlay!")
         logger.info("Press Ctrl+C to exit...")
         
         # PyQt5のイベントループを開始

@@ -1665,3 +1665,221 @@ self.safe_areas = {
 **ドキュメント更新**: 2025-07-05  
 **Grace Period機能実装完了**: ✅ Ready for Production Testing  
 **統合完了**: ✅ MacroController + LogMonitor + Grace Period
+
+## 2025-07-05 ステータスオーバーレイ機能実装
+
+### 🎯 **新機能: 常時表示ステータスオーバーレイ**
+
+ゲーム画面上にマクロのON/OFF状態を常時表示するオーバーレイ機能を追加実装。
+
+#### **実装ファイル構成**
+- `src/features/status_overlay.py`: **新規作成** - StatusOverlayクラス
+- `src/core/macro_controller.py`: **修正** - オーバーレイ統合
+- `main.py`: **修正** - GUI起動時のオーバーレイ作成
+- `src/gui/main_window.py`: **修正** - ボタン連携
+- `config/default_config.yaml`: **修正** - オーバーレイ設定追加
+
+### 🔧 **開発者向け技術仕様**
+
+#### **StatusOverlay クラス設計**
+```python
+class StatusOverlay(QWidget):
+    """マクロON/OFF状態の常時表示オーバーレイ"""
+    
+    # シグナル
+    position_changed = pyqtSignal(int, int)  # 位置変更通知
+    
+    # コンストラクタ
+    def __init__(self, parent=None, font_size=16):
+        # フォントサイズ設定対応
+        
+    # 主要メソッド
+    def set_macro_status(self, is_on: bool):      # 状態更新
+    def load_position(self, x, y):               # 位置読み込み
+    def save_position(self):                     # 位置保存
+```
+
+#### **ウィンドウフラグ設定**
+```python
+self.setWindowFlags(
+    Qt.WindowStaysOnTopHint |      # 常に最前面
+    Qt.FramelessWindowHint |       # フレームなし
+    Qt.Tool |                      # タスクバーに非表示
+    Qt.WindowTransparentForInput   # クリック透過（動的切り替え）
+)
+```
+
+#### **イベントハンドリング**
+- `enterEvent()` / `leaveEvent()`: マウスオーバー時のドラッグモード切り替え
+- `mousePressEvent()` / `mouseMoveEvent()` / `mouseReleaseEvent()`: ドラッグ操作
+- `paintEvent()`: カスタム描画（背景・境界線・テキスト）
+
+### 📊 **設定ファイル統合**
+
+#### **新規設定セクション**
+```yaml
+# Status overlay settings
+overlay:
+  status_position:
+    x: 1720      # オーバーレイX座標
+    y: 1050      # オーバーレイY座標
+    width: 150   # オーバーレイ幅
+    height: 40   # オーバーレイ高さ
+  font_size: 16  # フォントサイズ（解像度対応）
+```
+
+#### **解像度別推奨設定**
+- **1080p**: `font_size: 16`
+- **1440p**: `font_size: 18`
+- **4K**: `font_size: 20`
+
+### 🔄 **設定永続化システム**
+
+#### **位置自動保存フロー**
+```python
+# main.py - 自動保存機能
+def on_position_changed(x, y):
+    if 'overlay' not in config_manager.config:
+        config_manager.config['overlay'] = {}
+    if 'status_position' not in config_manager.config['overlay']:
+        config_manager.config['overlay']['status_position'] = {}
+    
+    config_manager.config['overlay']['status_position']['x'] = x
+    config_manager.config['overlay']['status_position']['y'] = y
+    config_manager.save_config(config_manager.config)
+
+status_overlay.position_changed.connect(on_position_changed)
+```
+
+### 🎮 **統合連携システム**
+
+#### **MacroController連携**
+```python
+# src/core/macro_controller.py
+class MacroController:
+    def __init__(self):
+        self.status_overlay = None  # オーバーレイ参照
+        
+    def set_status_overlay(self, overlay):
+        self.status_overlay = overlay
+        
+    def _notify_status_changed(self):
+        # 既存のコールバック処理
+        if self.status_changed_callback:
+            self.status_changed_callback(self.running)
+        
+        # オーバーレイ更新
+        if self.status_overlay:
+            self.status_overlay.set_macro_status(self.running)
+```
+
+#### **F12キーハンドラー強化**
+```python
+# F12キートグル時のオーバーレイ更新確認
+if key == pynput.keyboard.Key.f12:
+    if self.running:
+        self.stop()
+        if self.status_overlay:
+            logger.debug("F12: Status overlay updated to OFF")
+    else:
+        self.start()
+        if self.status_overlay:
+            logger.debug("F12: Status overlay updated to ON")
+```
+
+### 🛡️ **エラーハンドリング設計**
+
+#### **設定読み込み耐性**
+```python
+# 安全な設定取得
+overlay_config = config_manager.config.get('overlay', {}).get('status_position', {})
+font_size = config_manager.config.get('overlay', {}).get('font_size', 16)
+
+# フォールバック処理
+if overlay_config:
+    status_overlay.load_position(
+        overlay_config.get('x', 1720),  # デフォルト値
+        overlay_config.get('y', 1050)   # デフォルト値
+    )
+```
+
+#### **設定保存エラー処理**
+```python
+def on_position_changed(x, y):
+    try:
+        # 設定更新処理
+        config_manager.save_config(config_manager.config)
+        logger.info(f"オーバーレイ位置を保存しました: X={x}, Y={y}")
+    except Exception as e:
+        logger.error(f"オーバーレイ位置保存エラー: {e}")
+```
+
+### 🧪 **テスト・品質保証**
+
+#### **構文チェック対象**
+- `src/features/status_overlay.py`
+- `src/core/macro_controller.py`
+- `main.py`
+- `src/gui/main_window.py`
+
+#### **機能テスト項目**
+- オーバーレイ初期化・表示確認
+- F12キートグル連携確認
+- GUIボタン連携確認
+- 設定読み込み・保存確認
+- ドラッグ&ドロップ操作確認
+
+### 🚀 **パフォーマンス考慮事項**
+
+#### **軽量化設計**
+- `QTimer.singleShot` による遅延透過設定
+- 必要時のみの再描画（`update()`）
+- 軽量なシグナル-スロット通信
+
+#### **リソース使用量**
+- **CPU**: オーバーレイ描画時のみ使用
+- **メモリ**: 軽量なQWidgetインスタンス1個
+- **GPU**: なし（CPU描画）
+
+### 💡 **拡張性・カスタマイズ**
+
+#### **今後の拡張可能項目**
+- **テーマ設定**: 色・透明度のカスタマイズ
+- **アニメーション**: 状態変更時のエフェクト
+- **マルチ情報表示**: 統計情報・モジュール状態
+- **サイズ調整**: 幅・高さの動的変更
+
+#### **設定項目追加例**
+```yaml
+overlay:
+  theme:
+    background_color: [0, 0, 0, 180]    # RGBA
+    text_color_on: [0, 255, 0, 255]     # 緑色
+    text_color_off: [255, 0, 0, 255]    # 赤色
+    border_width: 2
+  animation:
+    enabled: true
+    duration: 200  # ms
+```
+
+### ✅ **ステータスオーバーレイ機能完成状態**
+
+**ステータスオーバーレイ機能は完全実装済み・実用可能**：
+- 🎨 **基本表示**: マクロ状態の視覚的フィードバック
+- 🔄 **状態連携**: F12キー・GUIボタンとの完全同期
+- 📍 **位置管理**: ドラッグ調整・自動保存・読み込み
+- ⚙️ **設定統合**: フォントサイズ・位置のファイル管理
+- 🛡️ **エラー耐性**: 設定破損・不正値への対応
+- 🎮 **ユーザビリティ**: 直感的操作・非侵入的表示
+
+**次回セッション項目追加**：
+- ステータスオーバーレイの実機動作確認
+- カスタム位置・フォントサイズの調整テスト
+- F12キートグルとの連携確認
+
+---
+
+**ドキュメント更新**: 2025-07-05  
+**Grace Period機能実装完了**: ✅ Ready for Production Testing  
+**ステータスオーバーレイ機能実装完了**: ✅ Ready for Production Testing  
+**統合完了**: ✅ MacroController + LogMonitor + Grace Period + StatusOverlay
