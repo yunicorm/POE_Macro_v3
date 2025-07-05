@@ -1,200 +1,114 @@
-# Path of Exile Automation Macro v3.0 要件定義書（更新版）
+# Path of Exile Automation Macro v3.0 要件定義書（完全版）
 
 ## 改訂履歴
 - 2025-01-15: 初版作成
-- 2025-07-05: Grace Period機能追加、全機能実装完了に合わせた仕様更新
+- 2025-07-05: Grace Period機能追加、全機能実装完了、設定ファイル例更新
+- 2025-07-06: Grace Period自動トグル機能追加
 
 ## 1. 機能要件
 
-### 1.1. フラスコ自動使用機能
-各フラスコは、マクロ起動と同時に指定されたループ処理を開始する。独立スレッドで動作し、設定可能な間隔でのランダム遅延によりアンチチート対策を実装している。
+### 1.1. フラスコ自動使用機能（実装済み）
+#### 実装済み機能
+- スロット1、2、4、5の計4つのフラスコを管理
+- 各フラスコの個別ON/OFF設定
+- フラスコごとの使用間隔設定（例：7.210～7.300秒）
+- ランダムな遅延によるアンチチート対策
+- 設定可能なキーバインド（デフォルト：1, 2, 4, 5）
 
-| 対象 | スロット | 割当キー | 持続時間 | ループタイミング | 備考 |
-|------|----------|----------|----------|------------------|------|
-| Granite Flask | slot_1 | 1 | 7.2 秒 | 7.21秒 ～ 7.30秒 | 物理ダメージ軽減 |
-| Cinderswallow Urn | slot_2 | 2 | 7.2 秒 | 7.21秒 ～ 7.30秒 | 生命力・マナ回復 |
-| Wine of the Prophet | slot_4 | 4 | 20.0 秒 | 20.0秒 ～ 21.0秒 | Divination Cardバフ付与 |
-| Divine Mana Flask | slot_5 | 5 | 5.0 秒 | 4.5秒 ～ 4.8秒 | マナ回復 |
+#### フラスコ種別と設定例
+| スロット | フラスコ名 | キー | 間隔（秒） |
+|----------|------------|------|-------------|
+| Slot 1 | Granite Flask | 1 | 7.210～7.300 |
+| Slot 2 | Cinderswallow Urn | 2 | 7.210～7.300 |
+| Slot 4 | Wine of the Prophet | 4 | 20.310～20.400 |
+| Slot 5 | Utility Flask | 5 | 7.210～7.300 |
 
-**技術仕様**:
-- 独立スレッド処理による非同期実行
-- 設定ファイル（YAML）による動的設定変更
-- 手動使用機能（GUI経由）
-- 統計情報管理（使用回数追跡）
+### 1.2. スキル自動発動機能（実装済み）
+#### 実装済み機能
+- 3種類のスキルの自動発動
+- 個別のON/OFF設定
+- ランダムな使用間隔設定
+- 独立したスレッドによる非同期処理
 
-### 1.2. スキル自動使用機能
-各スキルは、マクロ起動と同時に指定された間隔でのキー入力を開始する。
+#### スキル設定例
+| スキル名 | キー | 間隔（秒） | 説明 |
+|----------|------|-------------|------|
+| Berserk | E | 0.3～1.0 | 攻撃スキル、高頻度 |
+| Molten Shell | R | 0.3～1.0 | 防御スキル、高頻度 |
+| Order! To Me! | T | 3.5～4.0 | ミニオンコマンド、低頻度 |
 
-| 対象 | 割当キー | キー入力間隔 | 備考 |
-|------|----------|-------------|------|
-| Berserk | E | 0.3秒 ～ 1.0秒 のランダムな間隔 | クールダウン回復速度低下MODに対応するため、高頻度で実行。 |
-| Molten Shell | R | 0.3秒 ～ 1.0秒 のランダムな間隔 | 同上。 |
-| Order! To Me! | T | 3.5秒 ～ 4.0秒 のランダムな間隔 | 他のスキルより優先度を下げ、長めの間隔で実行。 |
+### 1.3. Tincture自動管理機能（実装済み）
+#### 実装済み機能
+- **画像認識によるTincture状態検出**：
+  - Active状態（使用中）：バフアイコンが表示されている
+  - Idle状態（使用可能）：バフアイコンが消えている
+- **スマート自動使用**：Idle状態検出時に自動で使用
+- **オーバーレイウィンドウ**：検出エリアの視覚的設定
+- **カスタマイズ可能な検出エリア**：座標・サイズ調整
+- **複数解像度対応**：プリセット選択可能
 
-### 1.3. Tincture (Sap of the Seasons) 自動使用機能
-Tinctureは、ゲーム画面の画像認識によって状態を判別し、効率的な自動使用を実行する。Active状態検出機能により、無駄な再使用を防ぎ効果を最大化する。
+#### Tincture管理仕様
+- **装備スロット**：デフォルトはSlot 3（キー: 3）
+- **検出頻度**：100ms間隔での高速処理
+- **画像認識精度**：感度調整可能（0.5～1.0）
+- **使用後の待機**：5秒のクールダウン
 
-- **検出対象**: オーバーレイで設定されたフラスコエリア内のTincture（3番スロット）
-- **割当キー**: 3
-- **検出モード**:
-  - `full_flask_area`: フラスコエリア全体での検出（推奨）
-  - `auto_slot3`: 3番スロット自動計算
-  - `manual`: 手動指定エリア
-
-#### 状態検出と自動使用ロジック
-1. **Idle状態検出**: `sap_of_the_seasons_idle.png`とのマッチング
-2. **Active状態検出**: `sap_of_the_seasons_active.png`とのマッチング
-3. **スマート使用制御**:
-   - Active状態: 使用せず効果維持
-   - Idle状態: 即座に使用（3キー入力）
-   - Unknown状態: 従来ロジックでフォールバック
-
-#### 技術仕様
-- **画像認識**: OpenCVテンプレートマッチング
-- **感度調整**: 0.0-1.0（デフォルト0.7）
-- **チェック間隔**: 0.1秒（設定可能）
-- **最小使用間隔**: 0.5秒（設定可能）
-- **統計管理**: Active/Idle/Unknown検出回数、使用回数
-
-#### 使用する画像アセット
-- **Tincture状態画像**:
-  - `assets/images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png`
-  - `assets/images/tincture/sap_of_the_seasons/active/sap_of_the_seasons_active.png`
-
-#### 1.3.1 検出エリア設定機能（実装済み）
-**概要**：
-オーバーレイウィンドウを使用してフラスコエリアを視覚的に設定し、その領域内でTincture検出を行う機能。
-
-**実装済み機能**：
-- **オーバーレイウィンドウ（PyQt5実装）**
-  - 半透明緑色矩形（Always on Top）
-  - グローバルホットキー対応（pynput使用）
-  - 座標・サイズのリアルタイム表示
-
-- **エリア調整機能**
-  - マウスドラッグ: 位置移動
-  - Shift+ドラッグ: サイズ変更
-  - マウスホイール: スケール調整（5%刻み、0.5x～2.0x）
-  - 矢印キー: 1px精密位置調整
-  - Shift+矢印: 1px精密サイズ調整
-
-- **設定管理**
-  - detection_areas.yaml自動保存
-  - 解像度別プリセット（1920x1080, 2560x1440, 3840x2160）
-  - GUI統合（キャリブレーションタブ）
-  - 設定変更の即時反映
-
-**操作仕様**：
-
-| 操作 | 機能 |
-|------|------|
-| マウスドラッグ | 矩形の移動 |
-| Shift+ドラッグ | サイズ変更 |
-| マウスホイール | スケール調整（5%刻み） |
-| 矢印キー | 1px単位の位置調整 |
-| Shift+矢印 | 1px単位のサイズ調整 |
-| Ctrl+S | 設定を保存 |
-| F9 | オーバーレイ表示切替 |
-| F10 | 設定モード終了 |
-
-**技術仕様**：
-- PyQt5による実装
-- 透明度50%の緑色矩形
-- pynputグローバルホットキー
-- AreaSelectorクラスによる座標管理
-- TinctureDetectorとの完全統合
-
-### 1.4. Grace Period（無敵時間）機能 【実装済み】
-Path of Exileでは戦闘エリアに入場すると60秒間の無敵時間（Grace Period）が適用され、プレイヤーが何らかの行動を取るまでモンスターから攻撃されない。この時間を有効活用するため、エリア入場時の自動マクロ開始を遅延させる機能。
-
-#### 1.4.1 基本仕様
-- **目的**: エリア再入場時のリスポーンキルを防ぎ、プレイヤーが安全に次の行動を計画できる時間を確保する
-- **動作**: 戦闘エリア入場を検知してもマクロを即座に開始せず、特定の入力を待機する
-- **適用エリア**: 戦闘エリアのみ（町・隠れ家では適用しない）
-
-#### 1.4.2 トリガー入力
-以下のいずれかの入力を検知した時点でマクロを開始する：
-- **左クリック**: キャラクター移動
-- **右クリック**: メイン攻撃スキル使用
-- **中央クリック**: サブ攻撃スキル使用
-- **Qキー**: 移動用スキル
-
-#### 1.4.3 動作フロー
-1. ログ監視によりエリア入場を検知
-2. 戦闘エリアかどうかを判定
-3. Grace Period機能が有効な場合：
-   - マクロを待機状態にする
-   - ログに「Entering grace period - waiting for player input...」を出力
-   - 入力監視を開始
-4. トリガー入力を検知：
-   - ログに「Player input detected (input_type) - starting macro」を出力
-   - 入力監視を停止
-   - マクロを開始
-5. エリア退場時は待機状態をリセット
-
-#### 1.4.4 設定項目
-```yaml
-grace_period:
-  enabled: true           # Grace Period機能の有効/無効
-  wait_for_input: true    # プレイヤー入力を待つかどうか
-  trigger_inputs:         # マクロ開始のトリガーとなる入力
-    - "mouse_left"        # 左クリック
-    - "mouse_right"       # 右クリック
-    - "mouse_middle"      # 中クリック
-    - "q"                 # Qキー
-```
-
-#### 1.4.5 例外処理
-- **手動操作の優先**: F12キーによる手動開始は待機状態を即座にキャンセル
-- **緊急停止**: Ctrl+Shift+F12による緊急停止は待機中でも有効
-- **タイムアウト**: 60秒経過後は自動的に待機状態を解除（オプション）
-
-### 1.5. 統合制御システム（実装済み）
-**MacroController**により、全モジュール（Flask/Skill/Tincture/LogMonitor）を統一的に制御する。
-
+### 1.4. Grace Period自動トグル機能（新規追加）
 #### 機能概要
-- **統一制御**: 単一のstart/stopメソッドで全機能制御
-- **緊急停止**: F12キーによる即座停止
-- **ステータス管理**: 全モジュールの動作状況集約
-- **エラーハンドリング**: 個別モジュールエラーの安全な処理
-- **GUI統合**: MainWindowとの完全連携
-- **ヘッドレスモード**: GUI無しでの動作対応
+戦闘エリア入場時の自動マクロ制御を実現する機能。既存のGrace Period機能を拡張。
 
-#### 技術仕様
-- スレッドセーフな実装
-- 設定の動的反映
-- 詳細ログシステム
-- pynput依存関係の自動フォールバック
+#### 詳細仕様
+1. **Grace Period設定**
+   - 待機時間：60秒
+   - トリガー入力：左クリック、右クリック、中央クリック、Qキー
+   - タイムアウト動作：60秒経過で自動的にマクロON
 
-### 1.6. 将来の拡張機能
-以下の機能は基本機能完了後の拡張として計画：
+2. **動作フロー**
+   ```
+   戦闘エリア入場
+       ↓
+   Grace Period開始（60秒タイマー）
+       ↓
+   並行監視：
+   - 特定入力監視 → 検知でマクロON
+   - タイマー監視 → 60秒経過でマクロON
+       ↓
+   マクロ起動 & Grace Period終了
+   ```
 
-#### Divination Cardバフ検出機能
-- 画面上部のバフエリアに表示されるDivination Cardバフアイコンの検出
-- Wine of the Prophet使用により付与される40種類のバフを識別
-- 優先度情報（highest-priority～lowest-priority）に基づく管理
+3. **再入場処理**
+   - 同じエリアでも再入場時は必ずGrace Periodを発動
+   - エリアキャッシュの無効化
 
-#### フラスコチャージ・プログレスバー検出機能
-- 各フラスコのチャージ量とプログレスバーの状態を画像認識で検出
-- チャージが十分にある場合のみ使用する制御
-- アセット例：`granite_flask_c060_p050.png`（チャージ60%、プログレス50%）
+4. **設定例**
+   ```yaml
+   log_monitor:
+     grace_period:
+       enabled: true
+       duration: 60
+       trigger_inputs:
+         mouse_buttons: ["left", "right", "middle"]
+         keyboard_keys: ["q"]
+       clear_cache_on_reenter: true
+   ```
 
-#### Divination Cardバフ連動機能
-- 検出されたバフの優先度に基づくWine of the Prophet使用制御
-- 高優先度バフ時の制御：highest-priority, high-priority等の重要度が高いバフが適用された場合、Wine of the Prophetの使用間隔を延長
-- 低優先度バフ時の制御：low-priority, lowest-priority等の重要度が低いバフが適用された場合、Wine of the Prophetの使用頻度を短縮
+### 1.5. 画像認識システム（実装済み）
+#### TinctureDetectorクラス仕様
+- **画像認識エンジン**：OpenCV テンプレートマッチング
+- **対応解像度**：1920x1080、2560x1440、3840x2160
+- **モニター設定**：Primary、Center、Right
+- **検出モード**：
+  - Manual（手動設定エリア）
+  - Auto Slot 3（自動計算位置）
+  - Full Flask Area（フラスコエリア全体）
 
-**優先度別の使用間隔例（将来実装時の想定）**
+#### 実装詳細
+- テンプレート画像による状態検出
+- リアルタイム画面キャプチャ（mssライブラリ使用）
+- マルチスレッド対応による非ブロッキング処理
+- 設定ファイルによる座標管理
 
-| バフ優先度 | 使用間隔の調整 | 制御の狙い |
-|------------|----------------|------------|
-| highest-priority | 26～28秒 | 極めて有益なバフを最大限維持 |
-| high-priority | 24～26秒 | 有益なバフを長く維持 |
-| medium-priority | 20～22秒 | 標準的な間隔で使用 |
-| low-priority | 12～15秒 | 低恩恵バフを早めに切り替え |
-| lowest-priority | 8～10秒 | 最小恩恵バフを高頻度で切り替え |
-
-### 1.7. GUI設定管理機能（実装済み）
+### 1.6. GUI設定管理機能（実装済み）
 #### 実装済み機能
 - **タブ式インターフェース**: PyQt5による6タブ構成
 - **リアルタイム設定変更**: GUI変更の即座反映
@@ -252,7 +166,8 @@ grace_period:
 | ログファイルパス | Client.txtの場所（デフォルトパスから変更可能） |
 | 自動ON/OFF | エリア入退場での自動制御有効/無効 |
 | Grace Period | 戦闘エリア入場時の待機機能ON/OFF |
-| 待機入力設定 | Grace Periodを解除する入力の選択 |
+| 待機時間 | Grace Period の待機時間（デフォルト：60秒） |
+| トリガー入力設定 | Grace Periodを解除する入力の選択 |
 | 除外エリア | 自動制御を適用しないエリアのリスト（例：町など） |
 | ログパターン | エリア入退場を検出するための正規表現パターン |
 
@@ -267,43 +182,39 @@ grace_period:
 | 詳細設定 | X,Y,幅,高さの手動調整 |
 | 設定保存 | detection_areas.yaml保存 |
 
-### 1.8. ログファイル監視機能（実装済み）
+### 1.7. ログファイル監視機能（実装済み）
 #### 実装済み仕様
 - **監視対象**: Client.txtのリアルタイム監視
 - **検出パターン**: "You have entered [エリア名]." 形式
 - **エリア分類**: 安全エリア（町・隠れ家）と戦闘エリアの自動判定
 - **Grace Period統合**: 戦闘エリア入場時の自動待機
-- **再入場対応**: 1時間キャッシュによるスマート処理
+- **再入場対応**: エリアキャッシュ制御
 
-#### 動作フロー（実装済み）:
-1. **戦闘エリア入場**: Grace Period待機 → 入力検知 → マクロ開始
+#### 動作フロー（Grace Period自動トグル対応）:
+1. **戦闘エリア入場**: 
+   - Grace Period開始（60秒）
+   - 特定入力検知またはタイムアウトでマクロON
 2. **安全エリア入場**: 即座にマクロ停止
 3. **エリア退場**: マクロ自動停止
-4. **再入場**: キャッシュによる効率的処理
+4. **再入場**: 同じエリアでもGrace Period再発動
 
-#### ログパターン例（仮）
+#### ログパターン例
 ```
 -- 入場パターン例
-2025/01/15 12:34:56 Entering area "Crimson Temple"
-2025/01/15 12:35:12 Entering area "Hideout"
-2025/01/15 12:35:45 Entering area "Crimson Temple"
+2025/01/15 12:34:56 You have entered Crimson Temple.
+2025/01/15 12:35:12 You have entered Hideout.
+2025/01/15 12:35:45 You have entered Crimson Temple.
 
 -- 退場パターン例
-2025/01/15 12:40:23 Leaving area "Crimson Temple"
+2025/01/15 12:40:23 You have left Crimson Temple.
 ```
-
-#### 実装詳細
-- リアルタイムでログファイルの末尾を監視
-- 新規ログエントリーを検出し、パターンマッチング実行
-- エリア名の記録と状態管理（現在のエリア、前回のエリア）
-- マクロのON/OFF制御はメインループと連携
 
 ## 2. 非機能要件
 
 | 項目 | 要件 |
 |------|------|
 | 実行環境 | ・OS: Windows 10/11<br>・Python: 3.13.5対応<br>・ディスプレイ構成: マルチモニター対応（Primary/Center/Right）<br>・解像度対応: 1920x1080, 2560x1440, 3840x2160<br>・ゲーム設定: Windowed Fullscreen推奨 |
-| パフォーマンス | ・CPU使用率: 5%以下（達成済み）<br>・画像認識処理: 100ms以内（達成済み）<br>・メモリ使用量: 200MB以下（最適化済み）<br>・Tincture検出: 100ms間隔での高速処理 |
+| パフォーマンス | ・CPU使用率: 5%以下（達成済み）<br>・画像認識処理: 100ms以内（達成済み）<br>・メモリ使用量: 200MB以下（最適化済み）<br>・Tincture検出: 100ms間隔での高速処理<br>・Grace Period入力検知: 100ms以内 |
 | 信頼性 | 長時間のゲームプレイセッション（数時間）において、エラーなく安定して動作すること。 |
 | 操作性 | ユーザーが単一の操作（特定のキーの組み合わせなど）でマクロ全体の開始と停止を切り替えられること。<br>Grace Period中でも手動操作を優先できること。 |
 | アンチチート対策 | 全てのキー入力タイミングにミリ秒単位のランダムな揺らぎを持たせ、機械的なパターンを排除する。 |
@@ -333,13 +244,15 @@ grace_period:
 
 8. **Grace Period機能はpynputライブラリに依存。** 環境によってはpynputが正常に動作しない場合があり、その際は機能が自動的に無効化される。（実装済みの自動フォールバック機能）
 
-9. **本マクロの使用は、Path of Exileの利用規約に違反する可能性があります。使用によるアカウントへのいかなる不利益（アカウント停止等）についても、開発者は一切の責任を負いません。利用は完全に自己責任で行うものとします。**
+9. **Grace Period自動トグル機能の入力検知は、左クリック、右クリック、中央クリック、Qキーに限定。** その他の入力ではGrace Periodは解除されない。
 
-10. **依存関係**: Python 3.13.5、PyQt5、OpenCV、pynput等の外部ライブラリが必要。requirements.txtで管理済み。
+10. **本マクロの使用は、Path of Exileの利用規約に違反する可能性があります。使用によるアカウントへのいかなる不利益（アカウント停止等）についても、開発者は一切の責任を負いません。利用は完全に自己責任で行うものとします。**
+
+11. **依存関係**: Python 3.13.5、PyQt5、OpenCV、pynput等の外部ライブラリが必要。requirements.txtで管理済み。
 
 ## 4. 開発状況
 
-### 完了済み機能（2025-07-05現在）：
+### 完了済み機能（2025-07-06現在）：
 
 **✅ 基本機能（完全実装済み）**
 - フラスコ自動使用（4スロット、独立スレッド処理）
@@ -352,6 +265,7 @@ grace_period:
 - オーバーレイ検出エリア設定（PyQt5、pynput統合）
 - ログファイル監視（エリア入退場自動検出）
 - Grace Period機能（戦闘エリア入場時待機）
+- Grace Period自動トグル機能（60秒タイムアウト、特定入力検知）
 - 画像認識システム（OpenCV、感度調整）
 - 設定管理（YAML、動的更新）
 
@@ -366,3 +280,114 @@ grace_period:
 - Divination Cardバフ検出
 - フラスコチャージ・プログレスバー検出
 - 機械学習による動的制御
+
+## 5. 設定ファイル例（完全版）
+
+```yaml
+# POE Macro v3.0 完全設定ファイル
+# Grace Period自動トグル機能対応版
+
+# フラスコ設定
+flask:
+  enabled: true
+  slot_1:
+    enabled: true
+    key: "1"
+    name: "Granite Flask"
+    delay_min: 7.210
+    delay_max: 7.300
+  slot_2:
+    enabled: true
+    key: "2"
+    name: "Cinderswallow Urn"
+    delay_min: 7.210
+    delay_max: 7.300
+  slot_4:
+    enabled: true
+    key: "4" 
+    name: "Wine of the Prophet"
+    delay_min: 20.310
+    delay_max: 20.400
+  slot_5:
+    enabled: true
+    key: "5"
+    name: "Utility Flask"
+    delay_min: 7.210
+    delay_max: 7.300
+
+# スキル設定
+skill:
+  enabled: true
+  berserk:
+    enabled: true
+    key: "e"
+    name: "Berserk"
+    delay_min: 0.300
+    delay_max: 1.000
+  molten_shell:
+    enabled: true
+    key: "r"
+    name: "Molten Shell"
+    delay_min: 0.300
+    delay_max: 1.000
+  order_to_me:
+    enabled: true
+    key: "t"
+    name: "Order! To Me!"
+    delay_min: 3.500
+    delay_max: 4.000
+
+# Tincture設定
+tincture:
+  enabled: true
+  key: "3"
+  name: "Sap of the Seasons"
+  detection:
+    sensitivity: 0.7
+    interval: 0.1
+    cooldown: 5.0
+    mode: "manual"  # manual, auto_slot3, full_flask_area
+
+# ログ監視設定
+log_monitor:
+  enabled: true
+  log_file_path: "C:/Program Files (x86)/Steam/steamapps/common/Path of Exile/logs/Client.txt"
+  check_interval: 0.5
+  safe_areas:
+    - "Hideout"
+    - "The Rogue Harbour"
+    - "Lioneye's Watch"
+    - "The Forest Encampment"
+    - "The Sarn Encampment"
+    - "Highgate"
+    - "Overseer's Tower"
+    - "The Bridge Encampment"
+    - "Oriath"
+    - "The Karui Shores"
+  grace_period:
+    enabled: true
+    duration: 60
+    trigger_inputs:
+      mouse_buttons: ["left", "right", "middle"]
+      keyboard_keys: ["q"]
+    clear_cache_on_reenter: true
+    timeout_action: "auto_enable"
+
+# システム設定
+system:
+  emergency_stop_key: "f12"
+  log_level: "INFO"
+  anti_cheat_delay: 0.050
+  
+# GUI設定
+gui:
+  theme: "default"
+  window_size:
+    width: 800
+    height: 600
+  show_statistics: true
+  update_interval: 1.0
+
+# オーバーレイ設定（別ファイル管理）
+# detection_areas.yaml および overlay_settings.yaml 参照
+```
