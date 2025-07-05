@@ -144,6 +144,10 @@ class MacroController:
             logger.warning("MacroController already running")
             return False
         
+        # 緊急停止ホットキーの設定（初回のみ）
+        if self.hotkey_listener is None or self.toggle_listener is None:
+            self._setup_global_hotkeys()
+        
         # Grace Period中は強制指定がない限り開始を拒否
         if self.grace_period_active and not force:
             logger.info("Start request ignored - Grace Period active")
@@ -257,6 +261,9 @@ class MacroController:
             
             logger.info("MacroController started successfully")
             
+            # emergency_stopフラグをリセット
+            self.emergency_stop = False
+            
             # ステータス変更を通知
             self._notify_status_changed()
             
@@ -269,7 +276,7 @@ class MacroController:
             raise
     
     def stop(self):
-        """全マクロモジュールを停止"""
+        """全マクロモジュールを停止（ホットキーリスナーは維持）"""
         if not self.running:
             logger.warning("MacroController not running")
             return
@@ -306,16 +313,7 @@ class MacroController:
             except Exception as e:
                 logger.error(f"Error stopping LogMonitor: {e}")
         
-        # ホットキーリスナーの停止
-        if self.hotkey_listener:
-            self.hotkey_listener.stop()
-            self.hotkey_listener = None
-        if self.toggle_listener:
-            self.toggle_listener.stop()
-            self.toggle_listener = None
-        if self.alt_toggle_listener:
-            self.alt_toggle_listener.stop()
-            self.alt_toggle_listener = None
+        # Grace Period関連リスナーのみ停止（ホットキーリスナーは継続）
         if self.input_listener:
             self.input_listener.stop()
             self.input_listener = None
@@ -323,15 +321,21 @@ class MacroController:
             self.mouse_listener.stop()
             self.mouse_listener = None
         
-        # リスナー監視タイマーの停止
-        if self._listener_check_timer:
-            self._listener_check_timer.cancel()
-            self._listener_check_timer = None
+        # ホットキーリスナーは停止しない（トグル機能のため）
+        # if self.hotkey_listener:
+        #     self.hotkey_listener.stop()
+        #     self.hotkey_listener = None
+        # if self.toggle_listener:
+        #     self.toggle_listener.stop()
+        #     self.toggle_listener = None
+        # if self.alt_toggle_listener:
+        #     self.alt_toggle_listener.stop()
+        #     self.alt_toggle_listener = None
         
         # 待機状態をリセット
         self.waiting_for_input = False
         
-        logger.info("MacroController stopped")
+        logger.info("MacroController stopped (hotkey listeners still active)")
         
         # ステータス変更を通知
         self._notify_status_changed()
@@ -494,7 +498,7 @@ class MacroController:
             except Exception as e:
                 logger.error(f"Error in key release handler: {e}")
         
-        # 複数トグルキー対応（F12, F11, Pause/Break）
+        # F12トグル機能（リスナー継続版）
         def on_press_toggle(key):
             try:
                 # デバッグログ: 検知したキーを記録
@@ -507,42 +511,46 @@ class MacroController:
                 
                 logger.debug(f"Key detected: {key_name}")
                 
-                # 複数のトグルキーに対応
-                toggle_keys = [
-                    pynput.keyboard.Key.f12,
-                    pynput.keyboard.Key.f11,
-                    pynput.keyboard.Key.pause  # Pause/Break キー
-                ]
-                
-                if key in toggle_keys:
-                    logger.info(f"Toggle triggered ({key_name})")
-                    self.toggle()
+                # F12キーのみでトグル（シンプル化）
+                if key == pynput.keyboard.Key.f12:
+                    if self.running:
+                        logger.info(f"Macro stopped by F12")
+                        self.stop()
+                    else:
+                        logger.info(f"Macro started by F12")
+                        self.start()
+                    # return False を削除 - リスナーを継続させる
                 
             except Exception as e:
                 logger.error(f"Error in toggle handler: {e}")
         
-        # より柔軟なキー検知のための追加処理
+        # 代替キー検知（F11/Pauseなど）
         def on_press_alt_toggle(key):
-            """代替のキー検知方法（特殊キー用）"""
+            """代替のキー検知方法（F11/Pause用）"""
             try:
-                # raw値による検知（仮想キー対応）
-                if hasattr(key, 'vk'):
-                    # F12のVKコード: 123, F11のVKコード: 122
-                    if key.vk in [123, 122, 19]:  # F12, F11, Pause
-                        key_names = {123: 'F12', 122: 'F11', 19: 'Pause'}
-                        logger.info(f"Alternative toggle triggered (VK {key.vk} = {key_names.get(key.vk, 'Unknown')})")
-                        self.toggle()
-                        # return文を削除してリスナーを継続動作させる
+                # F11とPauseキーのトグル機能
+                if key == pynput.keyboard.Key.f11 or key == pynput.keyboard.Key.pause:
+                    key_name = key.name if hasattr(key, 'name') else str(key)
+                    if self.running:
+                        logger.info(f"Macro stopped by {key_name}")
+                        self.stop()
+                    else:
+                        logger.info(f"Macro started by {key_name}")
+                        self.start()
+                    # return文なし - リスナーを継続させる
                 
-                # 文字キーによる代替検知
-                if hasattr(key, 'char') and key.char:
-                    # Ctrl+F でもトグル可能（デバッグ用）
-                    if key.char.lower() == 'f':
-                        current_keys = getattr(on_press_alt_toggle, 'current_keys', set())
-                        ctrl_pressed = any(k in current_keys for k in [pynput.keyboard.Key.ctrl_l, pynput.keyboard.Key.ctrl_r])
-                        if ctrl_pressed:
-                            logger.info("Toggle triggered (Ctrl+F)")
-                            self.toggle()
+                # raw値による検知（仮想キー対応）
+                elif hasattr(key, 'vk'):
+                    # F11のVKコード: 122, PauseのVKコード: 19
+                    if key.vk in [122, 19]:  # F11, Pause
+                        key_names = {122: 'F11', 19: 'Pause'}
+                        key_name = key_names.get(key.vk, f'VK{key.vk}')
+                        if self.running:
+                            logger.info(f"Macro stopped by {key_name}")
+                            self.stop()
+                        else:
+                            logger.info(f"Macro started by {key_name}")
+                            self.start()
                             
             except Exception as e:
                 logger.error(f"Error in alternative toggle handler: {e}")
@@ -577,7 +585,7 @@ class MacroController:
         except Exception as e:
             logger.warning(f"Alternative toggle listener failed to start: {e}")
         
-        logger.info("Hotkeys registered - Toggle: F12/F11/Pause/Ctrl+F, Emergency stop: Ctrl+Shift+F12")
+        logger.info("Hotkeys registered - Toggle: F12/F11/Pause, Emergency stop: Ctrl+Shift+F12")
     
     def _start_listener_monitor(self):
         """リスナーの健全性を監視し、必要に応じて再起動"""
@@ -641,7 +649,7 @@ class MacroController:
             if button in [pynput.mouse.Button.left, pynput.mouse.Button.right, pynput.mouse.Button.middle]:
                 logger.info(f"Grace Period ended by {button.name} click")
                 self._end_grace_period()
-                return False  # リスナーを停止
+                # return Falseを削除 - リスナーは_end_grace_period()で管理
         
         def on_press(key):
             """キーボード入力検知"""
@@ -653,7 +661,7 @@ class MacroController:
                 if hasattr(key, 'char') and key.char and key.char.lower() == 'q':
                     logger.info("Grace Period ended by Q key")
                     self._end_grace_period()
-                    return False  # リスナーを停止
+                    # return Falseを削除 - リスナーは_end_grace_period()で管理
             except Exception as e:
                 logger.error(f"Error in key detection: {e}")
         
@@ -779,6 +787,32 @@ class MacroController:
         self.start()
         return self
     
+    def shutdown(self):
+        """完全にシャットダウン（ホットキーリスナーも含む）"""
+        self.stop()
+        
+        # ホットキーリスナーの停止
+        if self.hotkey_listener:
+            self.hotkey_listener.stop()
+            self.hotkey_listener = None
+            logger.info("Hotkey listener stopped")
+        if self.toggle_listener:
+            self.toggle_listener.stop()
+            self.toggle_listener = None
+            logger.info("Toggle listener stopped")
+        if self.alt_toggle_listener:
+            self.alt_toggle_listener.stop()
+            self.alt_toggle_listener = None
+            logger.info("Alt toggle listener stopped")
+        
+        # リスナー監視タイマーの停止
+        if self._listener_check_timer:
+            self._listener_check_timer.cancel()
+            self._listener_check_timer = None
+            logger.info("Listener monitor stopped")
+        
+        logger.info("MacroController completely shut down")
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
         """コンテキストマネージャーとして使用"""
-        self.stop()
+        self.shutdown()
