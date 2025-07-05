@@ -42,10 +42,7 @@ class MacroController:
         logger.debug(f"Config keys available: {list(self.config.keys())}")
         
         # モジュールの初期化（各設定を安全に取得）
-        flask_config = self.config.get('flask', {})
-        if not isinstance(flask_config, dict):
-            logger.warning(f"Flask config is not dict: {type(flask_config)}, using fallback")
-            flask_config = {'enabled': False}
+        flask_config = self._convert_flask_config()
         logger.debug(f"Flask config for init: {flask_config}")
         
         skills_config = self.config.get('skills', {})
@@ -189,7 +186,7 @@ class MacroController:
                     logger.info("Using fallback config")
                 
                 # 各設定値を取得
-                flask_raw = self.config.get('flask', {})
+                flask_raw = self._convert_flask_config()
                 skills_raw = self.config.get('skills', {})
                 tincture_raw = self.config.get('tincture', {})
                 
@@ -385,11 +382,8 @@ class MacroController:
         self.config = config
         
         # 各モジュールの設定更新（安全な取得）
-        flask_config = config.get('flask', {})
-        if isinstance(flask_config, dict):
-            self.flask_module.update_config(flask_config)
-        else:
-            logger.warning(f"Flask config is not dict in update_config: {type(flask_config)}")
+        flask_config = self._convert_flask_config()
+        self.flask_module.update_config(flask_config)
         
         skills_config = config.get('skills', {})
         if isinstance(skills_config, dict):
@@ -707,17 +701,36 @@ class MacroController:
                 logger.warning("Configuration is not valid for manual flask use")
                 return
                 
-            flask_config = self.config.get('flask', {})
-            logger.debug(f"Flask config type: {type(flask_config)}")
+            # 新しい設定形式を使用
+            flask_slots = self.config.get('flask_slots', {})
             
-            if not isinstance(flask_config, dict):
-                logger.warning(f"Flask configuration is not valid: {type(flask_config)}")
-                return
+            # 旧形式との互換性チェック
+            if not flask_slots and 'flask' in self.config:
+                flask_config = self.config.get('flask', {})
+                slot_config = flask_config.get(slot, {})
+                logger.debug(f"Using old format - Slot {slot} config: {slot_config}")
                 
-            slot_config = flask_config.get(slot, {})
+                if isinstance(slot_config, dict):
+                    key = slot_config.get('key')
+                    if key:
+                        self.flask_module.keyboard.press_key(key)
+                        logger.info(f"Manual flask use (old format): {slot} -> {key}")
+                    else:
+                        logger.warning(f"No key configured for flask slot: {slot}")
+                else:
+                    logger.warning(f"Invalid configuration for flask slot: {slot} - {type(slot_config)}")
+                return
+            
+            # 新形式での処理
+            slot_config = flask_slots.get(slot, {})
             logger.debug(f"Slot {slot} config: {slot_config}")
             
             if isinstance(slot_config, dict):
+                # Tinctureスロットはスキップ
+                if slot_config.get('is_tincture', False):
+                    logger.info(f"Slot {slot} is configured as Tincture, skipping flask use")
+                    return
+                
                 key = slot_config.get('key')
                 if key:
                     self.flask_module.keyboard.press_key(key)
@@ -815,6 +828,34 @@ class MacroController:
             logger.info("Listener monitor stopped")
         
         logger.info("MacroController completely shut down")
+    
+    def _convert_flask_config(self):
+        """新しい設定形式に変換"""
+        flask_config = {
+            'enabled': self.config.get('flask', {}).get('enabled', False),
+            'flask_slots': {}
+        }
+        
+        # Flask&Tinctureタブの設定を読み込み
+        flask_slots = self.config.get('flask_slots', {})
+        
+        # 旧形式との互換性維持
+        if not flask_slots and 'flask' in self.config:
+            # 旧形式から変換
+            old_flask = self.config['flask']
+            for slot_key in ['slot_1', 'slot_2', 'slot_3', 'slot_4', 'slot_5']:
+                if slot_key in old_flask:
+                    slot_config = old_flask[slot_key]
+                    if slot_config.get('enabled', False):
+                        flask_slots[slot_key] = {
+                            'key': slot_config.get('key', ''),
+                            'duration_ms': int(slot_config.get('duration', 5) * 1000),
+                            'use_when_full': False,
+                            'is_tincture': False
+                        }
+        
+        flask_config['flask_slots'] = flask_slots
+        return flask_config
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """コンテキストマネージャーとして使用"""
