@@ -83,7 +83,7 @@ class TinctureModule:
     
     
     def start(self) -> None:
-        """Tincture モジュールを開始"""
+        """Tincture モジュールを高速開始"""
         if not self.enabled:
             logger.info("Tincture module is disabled")
             return
@@ -94,6 +94,7 @@ class TinctureModule:
         
         try:
             self.running = True
+            logger.info("Tincture module start signal sent")
             self.thread = threading.Thread(target=self._tincture_loop, daemon=True)
             self.thread.start()
             logger.info("Tincture module started successfully")
@@ -104,21 +105,22 @@ class TinctureModule:
             raise
     
     def stop(self) -> None:
-        """Tincture モジュールを停止"""
+        """Tincture モジュールを即座停止"""
         if not self.running:
             logger.info("Tincture module is not running")
             return
         
         try:
             self.running = False
+            logger.info("Tincture module stop signal sent")
             
-            # スレッドの終了を待機
+            # 短いタイムアウトでスレッド終了を待機（高速チェックで早期終了）
             if self.thread and self.thread.is_alive():
-                self.thread.join(timeout=2.0)
+                self.thread.join(timeout=0.1)  # 2.0 -> 0.1に短縮
                 if self.thread.is_alive():
-                    logger.warning("Tincture thread did not terminate gracefully")
+                    logger.warning("Tincture thread still running (fast stop)")
             
-            logger.info("Tincture module stopped successfully")
+            logger.info("Tincture module stopped")
             
         except Exception as e:
             logger.error(f"Error stopping tincture module: {e}")
@@ -158,9 +160,14 @@ class TinctureModule:
                             
                             logger.info(f"Tincture used successfully. Total uses: {self.stats['total_uses']}")
                         
-                        # 使用後は少し長めに待機（Active状態になるまで）
+                        # 使用後の待機も高速チェック対応
                         logger.debug("Waiting 2 seconds for tincture to become active...")
-                        time.sleep(2.0)  # Active状態への移行待ち
+                        # 2秒を200回に分割して高速チェック
+                        for _ in range(200):
+                            if not self.running:
+                                logger.debug("Tincture: Fast stop during wait")
+                                break
+                            time.sleep(0.01)  # 10ms間隔
                     else:
                         logger.debug(f"Skipping use - minimum interval not met ({time_since_last_use:.2f}s < {self.min_use_interval}s)")
                         self.stats['idle_detections'] += 1
@@ -176,14 +183,26 @@ class TinctureModule:
                     self.stats['failed_detections'] += 1
                     logger.debug(f"Tincture state error or unexpected: {current_state}")
                 
-                # 検出間隔
-                time.sleep(self.check_interval)
+                # 高速チェック対応の検出間隔（即座停止のため）
+                # チェック間隔を細かく分割してrunningチェック
+                sleep_chunks = max(1, int(self.check_interval / 0.01))  # 10ms間隔でチェック
+                for _ in range(sleep_chunks):
+                    if not self.running:
+                        logger.debug("Tincture: Fast stop detected")
+                        break
+                    time.sleep(0.01)  # 10ms間隔で高速チェック
                 
             except Exception as e:
                 logger.error(f"Error in tincture loop: {e}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                time.sleep(self.check_interval * 2)
+                # エラー時の待機も高速チェック対応
+                error_sleep = self.check_interval * 2
+                error_chunks = max(1, int(error_sleep / 0.01))
+                for _ in range(error_chunks):
+                    if not self.running:
+                        break
+                    time.sleep(0.01)
         
         logger.info("Tincture monitoring ended")
     

@@ -27,12 +27,13 @@ class FlaskModule:
         self.window_manager = window_manager
         
     def start(self):
-        """フラスコ自動使用を開始"""
+        """フラスコ自動使用を高速開始"""
         if self.running:
             logger.warning("Flask module already running")
             return
             
         self.running = True
+        logger.info("Flask module start signal sent")
         
         # フラスコスロットごとに自動使用を開始
         for slot_name, slot_config in self.config.items():
@@ -51,10 +52,13 @@ class FlaskModule:
                 logger.info(f"Started flask loop for {slot_name}")
     
     def stop(self):
-        """フラスコ自動使用を停止"""
+        """フラスコ自動使用を即座停止"""
         self.running = False
+        logger.info("Flask module stop signal sent")
+        
+        # 短いタイムアウトでスレッド終了を待機（高速チェックで早期終了）
         for thread in self.threads:
-            thread.join(timeout=1.0)
+            thread.join(timeout=0.2)  # 1.0 -> 0.2に短縮
         self.threads.clear()
         logger.info("Flask module stopped")
     
@@ -83,7 +87,7 @@ class FlaskModule:
         logger.debug("FlaskModule: WindowManager reference set")
     
     def _flask_loop(self, slot_name: str, config: Dict[str, Any]):
-        """個別フラスコのループ処理"""
+        """個別フラスコのループ処理（即座停止対応）"""
         key = config['key']
         loop_delay = config['loop_delay']
         
@@ -95,11 +99,12 @@ class FlaskModule:
             delay = random.uniform(loop_delay[0], loop_delay[1])
             logger.debug(f"{slot_name}: Waiting {delay:.3f}s before next use")
             
-            # 短時間間隔でチェックして停止要求に迅速に対応
-            for _ in range(int(delay * 10)):
+            # より短い間隔（25ms）でチェックして即座に反応
+            for _ in range(int(delay * 40)):  # 10 -> 40に変更（25ms間隔）
                 if not self.running:
+                    logger.debug(f"{slot_name}: Fast stop detected")
                     break
-                time.sleep(0.1)
+                time.sleep(0.025)  # 0.1 -> 0.025に変更（高速チェック）
             
             if self.running:
                 self._use_flask(key, slot_name)

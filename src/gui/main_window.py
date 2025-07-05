@@ -34,10 +34,14 @@ class MainWindow(QMainWindow):
         # UI要素の初期化
         self.init_ui()
         
-        # 定期更新タイマー
+        # 定期更新タイマー（高速更新）
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_status)
-        self.update_timer.start(1000)  # 1秒毎
+        self.update_timer.start(250)  # 250ms毎（高速更新）
+        
+        # 即時フィードバック用状態管理
+        self._last_running_status = False
+        self._status_update_pending = False
         
         logger.info("MainWindow initialized")
         
@@ -995,35 +999,62 @@ class MainWindow(QMainWindow):
             self.start_macro()
     
     def start_macro(self):
-        """マクロを開始（従来通り）"""
+        """マクロを高速開始（即時フィードバック）"""
         try:
+            # 即座にGUIを更新（ボタン押下時のフィードバック）
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.statusBar().showMessage("マクロ開始中...")
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()  # 即座更新
+            
             if self.macro_controller:
                 success = self.macro_controller.start(force=True)  # Grace Period無視
                 if success is not False:  # None or True
-                    self.start_btn.setEnabled(False)
-                    self.stop_btn.setEnabled(True)
-                self.statusBar().showMessage("マクロ実行中")
-                self.log_message("マクロを開始しました")
+                    self.statusBar().showMessage("マクロ実行中")
+                    self.log_message("マクロを開始しました - FAST")
+                else:
+                    # 開始失敗時のロールバック
+                    self.start_btn.setEnabled(True)
+                    self.stop_btn.setEnabled(False)
+                    self.statusBar().showMessage("Ready")
             else:
                 self.log_message("マクロコントローラーが初期化されていません")
+                # エラー時のロールバック
+                self.start_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                self.statusBar().showMessage("Ready")
             
         except Exception as e:
             self.log_message(f"マクロ開始エラー: {e}")
-            self.start_btn.setEnabled(True)
-            self.stop_btn.setEnabled(False)
-    
-    def stop_macro(self):
-        """マクロを停止"""
-        try:
-            if self.macro_controller:
-                self.macro_controller.stop()
+            # エラー時のロールバック
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
             self.statusBar().showMessage("Ready")
-            self.log_message("マクロを停止しました")
+    
+    def stop_macro(self):
+        """マクロを高速停止（即時フィードバック）"""
+        try:
+            # 即座にGUIを更新（ボタン押下時のフィードバック）
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            self.statusBar().showMessage("マクロ停止中...")
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()  # 即座更新
+            
+            if self.macro_controller:
+                self.macro_controller.stop()
+            
+            # 最終状態に更新
+            self.statusBar().showMessage("Ready")
+            self.log_message("マクロを停止しました - FAST")
             
         except Exception as e:
             self.log_message(f"マクロ停止エラー: {e}")
+            # エラー時でも状態をリセット
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            self.statusBar().showMessage("Ready")
     
     def manual_use_tincture(self):
         """Tinctureを手動使用"""
@@ -1050,64 +1081,96 @@ class MainWindow(QMainWindow):
             self.log_message(f"統計リセットエラー: {e}")
     
     def update_status(self):
-        """ステータスを定期更新"""
+        """ステータスを高速定期更新（即時フィードバック対応）"""
         try:
             if self.macro_controller:
                 status = self.macro_controller.get_status()
                 
-                # Tincture統計の更新
-                if 'tincture' in status and hasattr(self, 'tincture_uses_label'):
-                    tincture_stats = status['tincture'].get('stats', {})
-                    
-                    uses = tincture_stats.get('total_uses', 0)
-                    self.tincture_uses_label.setText(f"使用回数: {uses}")
-                    
-                    success = tincture_stats.get('detection_success', 0)
-                    self.detection_success_label.setText(f"検出成功: {success}")
-                    
-                    failed = tincture_stats.get('detection_failed', 0)
-                    self.detection_failed_label.setText(f"検出失敗: {failed}")
-                    
-                    last_use = tincture_stats.get('last_use')
-                    if last_use:
-                        import datetime
-                        dt = datetime.datetime.fromtimestamp(last_use)
-                        self.last_use_label.setText(f"最後の使用: {dt.strftime('%H:%M:%S')}")
+                # running状態だけを先にチェック（高速）
+                is_running = status.get('running', False)
+                waiting_for_input = status.get('waiting_for_input', False)
                 
-                # ステータスバーの更新
-                if status.get('waiting_for_input', False):
-                    self.statusBar().showMessage("Grace Period - プレイヤー入力待機中...")
-                    self.start_btn.setEnabled(False)
-                    self.stop_btn.setEnabled(True)
-                elif status.get('running', False):
-                    if not hasattr(self, '_last_running_status') or not self._last_running_status:
+                # UIを即座に更新（前回と状態が変わった場合のみ）
+                if is_running != self._last_running_status:
+                    if is_running:
                         self.statusBar().showMessage("マクロ実行中")
                         self.start_btn.setEnabled(False)
                         self.stop_btn.setEnabled(True)
-                        self._last_running_status = True
-                else:
-                    if not hasattr(self, '_last_running_status') or self._last_running_status:
+                        logger.debug("GUI: Fast status update - RUNNING")
+                    else:
                         self.statusBar().showMessage("Ready")
                         self.start_btn.setEnabled(True)
                         self.stop_btn.setEnabled(False)
-                        self._last_running_status = False
-            
+                        logger.debug("GUI: Fast status update - STOPPED")
+                    
+                    self._last_running_status = is_running
+                    # 即座更新
+                    from PyQt5.QtWidgets import QApplication
+                    QApplication.processEvents()
+                
+                # Grace Period状態の特別処理
+                if waiting_for_input:
+                    self.statusBar().showMessage("Grace Period - プレイヤー入力待機中...")
+                    self.start_btn.setEnabled(False)
+                    self.stop_btn.setEnabled(True)
+                
+                # 統計情報の更新（時間がかかる処理）
+                self._update_statistics(status)
+                        
         except Exception as e:
             logger.error(f"Status update error: {e}")
     
-    def on_macro_status_changed(self, is_running):
-        """MacroControllerからのステータス変更通知を受け取る"""
+    def _update_statistics(self, status):
+        """統計情報の更新（分離した重い処理）"""
         try:
+            # Tincture統計の更新
+            if 'tincture' in status and hasattr(self, 'tincture_uses_label'):
+                tincture_stats = status['tincture'].get('stats', {})
+                
+                uses = tincture_stats.get('total_uses', 0)
+                self.tincture_uses_label.setText(f"使用回数: {uses}")
+                
+                success = tincture_stats.get('detection_success', 0)
+                if hasattr(self, 'detection_success_label'):
+                    self.detection_success_label.setText(f"検出成功: {success}")
+                
+                failed = tincture_stats.get('detection_failed', 0)
+                if hasattr(self, 'detection_failed_label'):
+                    self.detection_failed_label.setText(f"検出失敗: {failed}")
+                
+                last_use = tincture_stats.get('last_use')
+                if last_use and hasattr(self, 'last_use_label'):
+                    import datetime
+                    dt = datetime.datetime.fromtimestamp(last_use)
+                    self.last_use_label.setText(f"最後の使用: {dt.strftime('%H:%M:%S')}")
+        
+        except Exception as e:
+            logger.error(f"Statistics update error: {e}")
+    
+    def on_macro_status_changed(self, is_running):
+        """MacroControllerからのステータス変更通知を即座受け取る（高速フィードバック）"""
+        try:
+            logger.debug(f"GUI: Immediate status change callback - running={is_running}")
+            
+            # 即座にGUIを更新（F12キーのレスポンシブ性向上）
             if is_running:
                 self.start_btn.setEnabled(False)
                 self.stop_btn.setEnabled(True)
                 self.statusBar().showMessage("マクロ実行中")
-                self.log_message("マクロが開始されました (F12)")
+                self.log_message("マクロが開始されました (F12) - INSTANT")
             else:
                 self.start_btn.setEnabled(True)
                 self.stop_btn.setEnabled(False)
                 self.statusBar().showMessage("Ready")
-                self.log_message("マクロが停止されました (F12)")
+                self.log_message("マクロが停止されました (F12) - INSTANT")
+            
+            # 状態を更新
+            self._last_running_status = is_running
+            
+            # 即座にGUIを描画更新（フォース更新）
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+            
         except Exception as e:
             logger.error(f"Error in macro status changed callback: {e}")
     

@@ -32,12 +32,13 @@ class SkillModule:
         }
         
     def start(self):
-        """スキル自動使用を開始"""
+        """スキル自動使用を高速開始"""
         if self.running:
             logger.warning("Skill module already running")
             return
             
         self.running = True
+        logger.info("Skill module start signal sent")
         
         # スキルごとに自動使用を開始
         for skill_name, skill_config in self.config.items():
@@ -56,10 +57,13 @@ class SkillModule:
                 logger.info(f"Started skill loop for {skill_name}")
     
     def stop(self):
-        """スキル自動使用を停止"""
+        """スキル自動使用を即座停止"""
         self.running = False
+        logger.info("Skill module stop signal sent")
+        
+        # 短いタイムアウトでスレッド終了を待機（高速チェックで早期終了）
         for thread in self.threads:
-            thread.join(timeout=1.0)
+            thread.join(timeout=0.15)  # 1.0 -> 0.15に短縮
         self.threads.clear()
         logger.info("Skill module stopped")
     
@@ -111,7 +115,7 @@ class SkillModule:
         logger.debug("SkillModule: WindowManager reference set")
     
     def _skill_loop(self, skill_name: str, config: Dict[str, Any]):
-        """個別スキルのループ処理"""
+        """個別スキルのループ処理（即座停止対応）"""
         key = config['key']
         interval = config['interval']
         
@@ -123,11 +127,12 @@ class SkillModule:
             delay = random.uniform(interval[0], interval[1])
             logger.debug(f"{skill_name}: Waiting {delay:.3f}s before next use")
             
-            # 短時間間隔でチェックして停止要求に迅速に対応
-            for _ in range(int(delay * 10)):
+            # より短い間隔（20ms）でチェックして即座に反応
+            for _ in range(int(delay * 50)):  # 10 -> 50に変更（20ms間隔）
                 if not self.running:
+                    logger.debug(f"{skill_name}: Fast stop detected")
                     break
-                time.sleep(0.1)
+                time.sleep(0.02)  # 0.1 -> 0.02に変更（高速チェック）
             
             if self.running:
                 self._use_skill(key, skill_name)
