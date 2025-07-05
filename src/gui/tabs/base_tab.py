@@ -22,6 +22,24 @@ class BaseTab:
         if self.main_window.log_text:
             self.main_window.log_message(message)
     
+    def log_info(self, message):
+        """Log info message to both file and GUI"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_message = f"[{timestamp}] INFO: {message}"
+        self.logger.info(message)
+        if hasattr(self.main_window, 'log_text') and self.main_window.log_text:
+            self.main_window.log_text.append(formatted_message)
+    
+    def log_error(self, message):
+        """Log error message to both file and GUI"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_message = f"[{timestamp}] ERROR: {message}"
+        self.logger.error(message)
+        if hasattr(self.main_window, 'log_text') and self.main_window.log_text:
+            self.main_window.log_text.append(formatted_message)
+    
     def get_config_value(self, section, key, default=None):
         """Get configuration value safely"""
         return self.config.get(section, {}).get(key, default)
