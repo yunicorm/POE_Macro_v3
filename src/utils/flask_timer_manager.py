@@ -21,13 +21,13 @@ class FlaskTimer:
             key: 使用キー
             duration_ms: 持続時間（ミリ秒）
             use_callback: 使用時のコールバック関数
-            use_when_full: チャージフル時のみ使用するか
+            use_when_full: チャージフル時のみ使用するか（廃止予定）
         """
         self.slot_num = slot_num
         self.key = key
         self.duration_ms = duration_ms
         self.use_callback = use_callback
-        self.use_when_full = use_when_full
+        self.use_when_full = use_when_full  # 互換性のために残す
         
         self.last_use_time = 0
         self.is_running = False
@@ -35,7 +35,7 @@ class FlaskTimer:
         
         # 統計情報
         self.total_uses = 0
-        self.total_skips = 0  # チャージフル待ちでスキップした回数
+        self.total_skips = 0  # 削除可能  # チャージフル待ちでスキップした回数
     
     def start(self):
         """タイマーを開始"""
@@ -62,16 +62,12 @@ class FlaskTimer:
                 
                 # 持続時間が経過したかチェック
                 if current_time - self.last_use_time >= self.duration_ms:
-                    # フラスコを使用
-                    if self._should_use_flask():
-                        if self.use_callback:
-                            self.use_callback(self.key)
-                        self.last_use_time = current_time
-                        self.total_uses += 1
-                        logger.debug(f"Flask used: slot {self.slot_num}, key {self.key}")
-                    else:
-                        self.total_skips += 1
-                        logger.debug(f"Flask skipped: slot {self.slot_num} (waiting for full charge)")
+                    # フラスコを使用（常に使用する）
+                    if self.use_callback:
+                        self.use_callback(self.key)
+                    self.last_use_time = current_time
+                    self.total_uses += 1
+                    logger.debug(f"Flask used: slot {self.slot_num}, key {self.key}")
                 
                 # 100ms待機
                 time.sleep(0.1)
@@ -81,12 +77,7 @@ class FlaskTimer:
                 time.sleep(1.0)  # エラー時は長めに待機
     
     def _should_use_flask(self) -> bool:
-        """フラスコを使用すべきかどうかを判断"""
-        if not self.use_when_full:
-            return True
-        
-        # TODO: チャージフル判定の実装
-        # 現在は常にTrueを返す（将来的に画像認識で判定）
+        """フラスコを使用すべきかどうかを判断（廃止）"""
         return True
     
     def force_use(self):
@@ -296,18 +287,23 @@ class FlaskTimerManager:
                     if slot_config.get('is_tincture', False):
                         continue
                     
+                    # ★ use_when_fullがTrueの場合もスキップ（マクロ自動化を無効化）
+                    if slot_config.get('use_when_full', False):
+                        logger.info(f"Flask slot {slot_num} skipped: use_when_full is True (using in-game enchant)")
+                        continue
+                    
                     key = slot_config.get('key', '')
                     duration_ms = slot_config.get('duration_ms', 5000)
-                    use_when_full = slot_config.get('use_when_full', False)
                     
                     if key.strip():
-                        self.add_flask_timer(slot_num, key, duration_ms, use_when_full)
+                        # use_when_fullは常にFalseでタイマーを作成
+                        self.add_flask_timer(slot_num, key, duration_ms, use_when_full=False)
                     
                 except (ValueError, KeyError) as e:
                     logger.error(f"Error parsing flask slot config {slot_key}: {e}")
         
         # フラスコが有効な場合はタイマーを開始
-        if flask_config.get('enabled', False):
+        if flask_config.get('flask', {}).get('enabled', False):
             self.start_all_timers()
         
         logger.info(f"Flask timer config updated: {self.get_timer_count()} timers loaded")

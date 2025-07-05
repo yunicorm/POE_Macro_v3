@@ -130,8 +130,11 @@ class FlaskTinctureTab(BaseTab):
         slot_widgets['is_tincture'] = tincture_cb
         layout.addWidget(tincture_cb, 0, 2)
         
-        # フラスコ属性プルダウン
-        layout.addWidget(QLabel("フラスコ属性:"), 1, 0)
+        # フラスコ属性プルダウン（行1）
+        flask_type_label = QLabel("フラスコ属性:")  # ラベルを変数に保存
+        layout.addWidget(flask_type_label, 1, 0)
+        slot_widgets['flask_type_label'] = flask_type_label  # ウィジェット辞書に追加
+        
         flask_type_combo = QComboBox()
         flask_type_combo.addItems(self.flask_data_manager.get_all_flask_types())
         # 保存された値を設定
@@ -195,8 +198,11 @@ class FlaskTinctureTab(BaseTab):
         layout.addWidget(base_combo, 4, 1, 1, 2)  # 行4に移動
         # 保存された詳細値は後で設定（プルダウンが更新された後）
         
-        # 持続時間入力
-        layout.addWidget(QLabel("持続時間(秒):"), 5, 0)
+        # 持続時間入力（行5）
+        duration_label = QLabel("持続時間(秒):")  # ラベルを変数に保存
+        layout.addWidget(duration_label, 5, 0)
+        slot_widgets['duration_label'] = duration_label  # ウィジェット辞書に追加
+        
         duration_spinbox = QDoubleSpinBox()
         duration_spinbox.setRange(0.0, 30.0)
         duration_spinbox.setDecimals(2)
@@ -205,8 +211,9 @@ class FlaskTinctureTab(BaseTab):
         slot_widgets['duration'] = duration_spinbox
         layout.addWidget(duration_spinbox, 5, 1, 1, 2)
         
-        # チャージフル使用チェックボックス
-        charge_full_cb = QCheckBox("チャージがフルの時のみ使用")
+        # チャージフル使用チェックボックス（行6）
+        charge_full_cb = QCheckBox("自動化を停止")  # ★ ラベルを変更
+        charge_full_cb.setToolTip("このフラスコのマクロによる自動使用を無効にします")
         charge_full_cb.setChecked(slot_config.get('use_when_full', False))
         slot_widgets['use_when_full'] = charge_full_cb
         layout.addWidget(charge_full_cb, 6, 0, 1, 3)
@@ -437,16 +444,93 @@ class FlaskTinctureTab(BaseTab):
         widgets = self.flask_slot_widgets[slot_num]
         
         # フラスコ設定項目の有効/無効を切り替え
+        # フラスコ属性（Life, Mana, Hybrid, Utility, Wine）
         widgets['flask_type'].setEnabled(not is_checked)
+        
+        # レアリティ（Magic, Unique）とそのラベル
         widgets['rarity'].setEnabled(not is_checked)
-        widgets['detail'].setEnabled(not is_checked)
-        widgets['base'].setEnabled(not is_checked)
+        widgets['rarity_label'].setEnabled(not is_checked)
+        
+        # 詳細（ユニーク名/ベースタイプ）とそのラベル
+        if widgets['detail'].isVisible():
+            widgets['detail'].setEnabled(not is_checked)
+            widgets['detail_label'].setEnabled(not is_checked)
+        
+        # ベース（Utility用）とそのラベル
+        if widgets['base'].isVisible():
+            # Utility+Uniqueの場合、ベースは自動設定なのでチェック状態に関わらず無効
+            if widgets['rarity'].currentText() == "Unique" and widgets['flask_type'].currentText() == "Utility":
+                widgets['base'].setEnabled(False)
+            else:
+                widgets['base'].setEnabled(not is_checked)
+            widgets['base_label'].setEnabled(not is_checked)
+        
+        # 持続時間
         widgets['duration'].setEnabled(not is_checked)
+        
+        # チャージフル使用
         widgets['use_when_full'].setEnabled(not is_checked)
         
+        # すべてのラベルの有効/無効を切り替え
+        if 'flask_type_label' in widgets:
+            widgets['flask_type_label'].setEnabled(not is_checked)
+        
+        if 'duration_label' in widgets:
+            widgets['duration_label'].setEnabled(not is_checked)
+        
+        # グレーアウト時の視覚的フィードバック
         if is_checked:
-            # Tinctureチェック時の処理
-            self.update_tincture_key_assignment()
+            # Tinctureチェック時：グレーアウトスタイルを適用
+            widgets['flask_type'].setStyleSheet("QComboBox { color: gray; }")
+            widgets['rarity'].setStyleSheet("QComboBox { color: gray; }")
+            widgets['detail'].setStyleSheet("QComboBox { color: gray; }")
+            widgets['base'].setStyleSheet("QComboBox { color: gray; }")
+            widgets['duration'].setStyleSheet("QDoubleSpinBox { color: gray; }")
+            widgets['use_when_full'].setStyleSheet("QCheckBox { color: gray; }")
+            
+            # ラベルもグレーアウト
+            widgets['rarity_label'].setStyleSheet("QLabel { color: gray; }")
+            if widgets['detail_label'].isVisible():
+                widgets['detail_label'].setStyleSheet("QLabel { color: gray; }")
+            if widgets['base_label'].isVisible():
+                widgets['base_label'].setStyleSheet("QLabel { color: gray; }")
+            if 'flask_type_label' in widgets:
+                widgets['flask_type_label'].setStyleSheet("QLabel { color: gray; }")
+            if 'duration_label' in widgets:
+                widgets['duration_label'].setStyleSheet("QLabel { color: gray; }")
+        else:
+            # Tinctureチェック解除時：通常スタイルに戻す
+            widgets['flask_type'].setStyleSheet("")
+            widgets['rarity'].setStyleSheet("")
+            widgets['detail'].setStyleSheet("")
+            widgets['base'].setStyleSheet("")
+            widgets['duration'].setStyleSheet("")
+            widgets['use_when_full'].setStyleSheet("")
+            
+            # ラベルも通常スタイルに戻す
+            widgets['rarity_label'].setStyleSheet("")
+            widgets['detail_label'].setStyleSheet("")
+            widgets['base_label'].setStyleSheet("")
+            if 'flask_type_label' in widgets:
+                widgets['flask_type_label'].setStyleSheet("")
+            if 'duration_label' in widgets:
+                widgets['duration_label'].setStyleSheet("")
+            
+            # Utility+Uniqueのベースは再度無効化が必要な場合
+            if widgets['rarity'].currentText() == "Unique" and widgets['flask_type'].currentText() == "Utility":
+                widgets['base'].setEnabled(False)
+        
+        # Tinctureチェック数の検証とキー割り当て更新（既存の処理）
+        if is_checked:
+            # Experienced Herbalistがオフの場合、最大1つまで
+            if not self.main_window.experienced_herbalist_cb.isChecked():
+                self.uncheck_excess_tinctures(1)
+            else:
+                # Experienced Herbalistがオンでも最大2つまで
+                self.uncheck_excess_tinctures(2)
+        
+        # キー割り当て表示を更新
+        self.update_tincture_key_assignment()
         
     def on_flask_type_changed(self, slot_num, flask_type):
         """フラスコ属性変更時の処理"""
@@ -810,6 +894,10 @@ class FlaskTinctureTab(BaseTab):
         # Tinctureの場合は追加の検証をスキップ
         if config['is_tincture']:
             return True, ""
+        
+        # use_when_fullがTrueの場合の情報メッセージ
+        if config.get('use_when_full', False):
+            logger.info(f"Slot with key '{config['key']}' will not be automated (using in-game enchant)")
         
         # フラスコ設定の検証
         flask_type = config['flask_type']
