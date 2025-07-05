@@ -126,6 +126,49 @@ def main():
         logger.error(f"Failed to start application: {e}")
         return 1
 
+def detect_rightmost_monitor(app):
+    """
+    右端のモニターを検出し、MainWindow配置用の座標を返す
+    
+    Args:
+        app: QApplication インスタンス
+        
+    Returns:
+        tuple: (x, y) 座標のタプル。単一モニターの場合は None
+    """
+    logger = logging.getLogger(__name__)
+    
+    try:
+        screens = app.screens()
+        logger.info(f"検出されたモニター数: {len(screens)}")
+        
+        if len(screens) <= 1:
+            logger.info("単一モニター環境のためデフォルト位置を使用")
+            return None
+        
+        # 各モニターの情報をログ出力
+        for i, screen in enumerate(screens):
+            geometry = screen.geometry()
+            logger.info(f"モニター{i+1}: X={geometry.x()}, Y={geometry.y()}, "
+                       f"W={geometry.width()}, H={geometry.height()}")
+        
+        # 最もX座標が大きいスクリーンを右モニターとして検出
+        rightmost_screen = max(screens, key=lambda s: s.geometry().x())
+        geometry = rightmost_screen.geometry()
+        
+        # 右モニターの適切な位置を計算（左端から100px、上端から100px）
+        position_x = geometry.x() + 100
+        position_y = geometry.y() + 100
+        
+        logger.info(f"右モニター検出: X={geometry.x()}, Y={geometry.y()}")
+        logger.info(f"MainWindow配置位置: X={position_x}, Y={position_y}")
+        
+        return (position_x, position_y)
+        
+    except Exception as e:
+        logger.error(f"モニター検出エラー: {e}")
+        return None
+
 def run_headless(macro_controller):
     """GUI無しモードで実行"""
     logger = logging.getLogger(__name__)
@@ -205,6 +248,18 @@ def run_gui(config_manager, macro_controller):
         # MainWindowを起動
         from gui.main_window import MainWindow
         main_window = MainWindow(config_manager, macro_controller)
+        
+        # 右モニター検出と位置設定
+        try:
+            position = detect_rightmost_monitor(app)
+            if position:
+                main_window.move(position[0], position[1])
+                logger.info(f"設定ウィンドウを右モニターに配置: X={position[0]}, Y={position[1]}")
+            else:
+                logger.info("デフォルト位置で設定ウィンドウを表示")
+        except Exception as e:
+            logger.error(f"MainWindow位置設定エラー: {e} - デフォルト位置を使用")
+        
         main_window.show()
         
         # 初期状態を設定（マクロオフ）
