@@ -3,18 +3,21 @@
 """
 import yaml
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Any
+from src.utils.resource_path import get_config_path, get_user_config_path, ensure_directory_exists
 
 logger = logging.getLogger(__name__)
 
 class ConfigManager:
     """設定ファイルを管理するクラス"""
     
-    def __init__(self, config_path: str = "config/default_config.yaml"):
-        self.config_path = Path(config_path)
+    def __init__(self, config_path: str = "default_config.yaml"):
+        self.config_filename = config_path
+        self.config_path = get_config_path(config_path)
         self.config = {}
-        self.user_config_path = Path("config/user_config.yaml")
+        self.user_config_path = get_user_config_path("user_config.yaml")
         
     def load_config(self) -> Dict[str, Any]:
         """設定ファイルを読み込む"""
@@ -87,7 +90,7 @@ class ConfigManager:
     def save_user_config(self) -> None:
         """現在の設定をユーザー設定として保存"""
         try:
-            self.user_config_path.parent.mkdir(parents=True, exist_ok=True)
+            ensure_directory_exists(self.user_config_path)
             with open(self.user_config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.config, f, default_flow_style=False, allow_unicode=True)
             logger.info(f"Saved user config to {self.user_config_path}")

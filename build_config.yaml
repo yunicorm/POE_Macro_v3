@@ -1,0 +1,47 @@
+# POE Macro v3 Build Configuration
+
+app_name: poe_macro_v3
+version_file: src/version.py
+spec_file: poe_macro_v3.spec
+output_dir: dist
+build_dir: build
+icon_path: assets/poe_macro.ico
+
+# Files and directories to exclude from build
+exclude_patterns:
+  - __pycache__
+  - "*.pyc"
+  - .git
+  - .gitignore
+  - .vscode
+  - tests
+  - docs
+  - "*.log"
+  - "*.md"
+  - test_*.py
+  - build_*.py
+  - scripts
+  - releases
+
+# PyInstaller options
+pyinstaller_options:
+  onefile: true
+  windowed: true
+  clean: true
+  
+# Build profiles
+profiles:
+  dev:
+    debug: true
+    console: true
+    optimize: false
+  release:
+    debug: false
+    console: false
+    optimize: true
+    
+# Signing configuration (optional)
+code_signing:
+  enabled: false
+  certificate: null
+  password: null

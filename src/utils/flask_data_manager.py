@@ -5,6 +5,7 @@ import os
 import csv
 import logging
 from typing import Dict, List, Optional, Tuple
+from src.utils.resource_path import get_flask_data_path
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class FlaskDataManager:
             flask_types = ["life_unique", "mana_unique", "hybrid_unique", "utility_unique"]
             
             for flask_type in flask_types:
-                file_path = os.path.join(self.data_dir, f"{flask_type}.csv")
+                file_path = get_flask_data_path(f"{flask_type}.csv")
                 if os.path.exists(file_path):
                     self.flask_data[flask_type] = self.load_csv_file(file_path)
                     logger.info(f"Loaded {len(self.flask_data[flask_type])} items from {file_path}")
@@ -38,7 +39,7 @@ class FlaskDataManager:
                     self.flask_data[flask_type] = []
             
             # ユーティリティベースタイプのCSVを追加読み込み
-            utility_bases_path = os.path.join(self.data_dir, "utility_bases.csv")
+            utility_bases_path = get_flask_data_path("utility_bases.csv")
             if os.path.exists(utility_bases_path):
                 self.utility_bases_data = self.load_csv_file(utility_bases_path)
                 logger.info(f"Loaded {len(self.utility_bases_data)} utility base types")

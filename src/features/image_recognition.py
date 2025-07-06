@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Tuple, Dict
 from pathlib import Path
 import mss
+from src.utils.resource_path import get_asset_path
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +100,8 @@ class TinctureDetector:
                 logger.warning(f"[INIT] 検出エリア情報の取得に失敗: {e}")
         
         # テンプレート画像を読み込み（Idle + Active状態）
-        self.template_idle_path = Path("assets/images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png")
-        self.template_active_path = Path("assets/images/tincture/sap_of_the_seasons/active/sap_of_the_seasons_active.png")
+        self.template_idle_path = Path(get_asset_path("images/tincture/sap_of_the_seasons/idle/sap_of_the_seasons_idle.png"))
+        self.template_active_path = Path(get_asset_path("images/tincture/sap_of_the_seasons/active/sap_of_the_seasons_active.png"))
         
         self.template_idle = None
         self.template_active = None
