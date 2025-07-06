@@ -8,7 +8,6 @@ import sys
 import logging
 import argparse
 from pathlib import Path
-from PyQt5.QtWidgets import QApplication
 from logging.handlers import RotatingFileHandler
 
 # プロジェクトのsrcディレクトリをPythonパスに追加
@@ -215,15 +214,34 @@ def run_gui(config_manager, macro_controller):
         logger.info("run_gui開始 - loggerが正常に初期化されました")
         
         # GUI アプリケーションの準備
-        logger.info("QApplicationを初期化中...")
-        app = QApplication(sys.argv)
-        logger.info("QApplicationが正常に初期化されました")
+        logger.info("PyQt5とQApplicationを初期化中...")
+        try:
+            from PyQt5.QtWidgets import QApplication
+            app = QApplication(sys.argv)
+            logger.info("QApplicationが正常に初期化されました")
+        except ImportError as e:
+            logger.error(f"PyQt5のインポートに失敗: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"QApplication初期化エラー: {e}")
+            import traceback
+            logger.error(f"QApplication traceback: {traceback.format_exc()}")
+            raise
         
         # ステータスオーバーレイを作成（設定から位置を読み込む）
+        logger.info("StatusOverlayをインポート中...")
         try:
             from src.features.status_overlay import StatusOverlay
+            logger.info("StatusOverlayのインポートが完了しました")
         except ImportError as import_error:
             logger.error(f"StatusOverlayのimportに失敗: {import_error}")
+            import traceback
+            logger.error(f"Import traceback: {traceback.format_exc()}")
+            raise
+        except Exception as e:
+            logger.error(f"StatusOverlayインポート時の予期しないエラー: {e}")
+            import traceback
+            logger.error(f"Unexpected error traceback: {traceback.format_exc()}")
             raise
         overlay_config = config_manager.config.get('overlay', {}).get('status_position', {})
         font_size = config_manager.config.get('overlay', {}).get('font_size', 16)
@@ -289,6 +307,8 @@ def run_gui(config_manager, macro_controller):
         return 0
     except Exception as e:
         logger.error(f"Error in GUI mode: {e}")
+        import traceback
+        logger.error(f"GUI mode traceback: {traceback.format_exc()}")
         return 1
 
 if __name__ == "__main__":
