@@ -18,6 +18,10 @@ class SkillsTab(BaseTab):
         
         self.main_window.skills_enabled_cb = QCheckBox("スキル自動使用を有効化")
         skills_enabled = self.get_config_value('skills', 'enabled', True)
+        
+        # デバッグログ追加
+        self.logger.debug(f"Skills tab - loaded enabled value: {skills_enabled}")
+        
         self.main_window.skills_enabled_cb.setChecked(skills_enabled)
         self.main_window.skills_enabled_cb.stateChanged.connect(self.on_skills_enabled_changed)
         self.main_window.skills_enabled_cb.stateChanged.connect(self.save_skills_settings)  # 自動保存を追加
@@ -56,10 +60,20 @@ class SkillsTab(BaseTab):
             if 'skills' not in self.config:
                 self.config['skills'] = {}
             
-            self.config['skills']['enabled'] = self.main_window.skills_enabled_cb.isChecked()
+            checkbox_state = self.main_window.skills_enabled_cb.isChecked()
+            self.config['skills']['enabled'] = checkbox_state
+            
+            # デバッグログ追加
+            self.logger.debug(f"Saving skills settings - checkbox state: {checkbox_state}")
+            self.logger.debug(f"Skills config before save: {self.config.get('skills', {})}")
             
             # 設定を保存
             self.config_manager.save_config(self.config)
+            
+            # 保存後の確認
+            saved_config = self.config_manager.load_config()
+            saved_enabled = saved_config.get('skills', {}).get('enabled', 'NOT_FOUND')
+            self.logger.debug(f"Skills config after save: {saved_enabled}")
             
             # MacroControllerに反映
             if self.main_window.macro_controller:
@@ -68,7 +82,7 @@ class SkillsTab(BaseTab):
                     self.main_window.macro_controller.skill_module.update_config(skills_config)
                     self.log_info("スキル設定をMacroControllerに反映しました")
             
-            self.log_info("スキル設定を保存しました")
+            self.log_info(f"スキル設定を保存しました (enabled: {checkbox_state})")
             
         except Exception as e:
             self.log_error(f"スキル設定保存エラー: {e}")

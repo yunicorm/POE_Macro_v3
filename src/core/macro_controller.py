@@ -190,6 +190,10 @@ class MacroController:
                 skills_raw = self.config.get('skills', {})
                 tincture_raw = self.config.get('tincture', {})
                 
+                # デバッグ：設定値を確認
+                logger.debug(f"MacroController start - skills_raw: {skills_raw}")
+                logger.debug(f"MacroController start - skills enabled: {skills_raw.get('enabled', 'NOT_FOUND')}")
+                
                 # Path of Exileウィンドウをアクティブにする（非ブロッキング）
                 def activate_window():
                     try:

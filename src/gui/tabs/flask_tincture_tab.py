@@ -28,17 +28,7 @@ class FlaskTinctureTab(BaseTab):
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
         
-        # Tincture設定グループを先に作成（experienced_herbalist_cbを含む）
-        tincture_group = self.create_tincture_group()
-        main_layout.addWidget(tincture_group)
-        
-        # セパレーター
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        main_layout.addWidget(separator)
-        
-        # フラスコスロット設定グループ
+        # ★順序を元に戻す：フラスコスロット設定グループを先に
         flask_group = self.create_flask_slots_group()
         main_layout.addWidget(flask_group)
         
@@ -56,6 +46,16 @@ class FlaskTinctureTab(BaseTab):
         save_button_layout.addWidget(save_all_btn)
         
         main_layout.addLayout(save_button_layout)
+        
+        # セパレーター
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        main_layout.addWidget(separator)
+        
+        # ★Tincture設定グループは下部に配置
+        tincture_group = self.create_tincture_group()
+        main_layout.addWidget(tincture_group)
         
         # 統計情報グループ
         stats_group = self.create_stats_group()

@@ -20,9 +20,11 @@ class SkillModule:
             logger.error(f"SkillModule.__init__ received non-dict config: {type(config)} - {config}")
             config = {'enabled': False}  # フォールバック設定
         
+        # デバッグログ追加
+        logger.debug(f"SkillModule initialized with config keys: {list(config.keys())}")
+        logger.debug(f"SkillModule enabled status: {config.get('enabled', False)}")
+        
         self.config = config
-        logger.debug(f"SkillModule initialized with config: {config}")
-        logger.debug(f"Config 'enabled' value: {config.get('enabled', 'NOT FOUND')}")
         self.keyboard = KeyboardController()
         self.running = False
         self.threads = []
