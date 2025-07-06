@@ -451,37 +451,32 @@ class FlaskTinctureTab(BaseTab):
         # フラスコ設定項目の有効/無効を切り替え
         # フラスコ属性（Life, Mana, Hybrid, Utility, Wine）
         widgets['flask_type'].setEnabled(not is_checked)
+        if 'flask_type_label' in widgets:
+            widgets['flask_type_label'].setEnabled(not is_checked)
         
         # レアリティ（Magic, Unique）とそのラベル
         widgets['rarity'].setEnabled(not is_checked)
         widgets['rarity_label'].setEnabled(not is_checked)
         
-        # 詳細（ユニーク名/ベースタイプ）とそのラベル
-        if widgets['detail'].isVisible():
-            widgets['detail'].setEnabled(not is_checked)
-            widgets['detail_label'].setEnabled(not is_checked)
+        # 詳細（ユニーク名/ベースタイプ）とそのラベル - 常に処理する
+        widgets['detail'].setEnabled(not is_checked)
+        widgets['detail_label'].setEnabled(not is_checked)
         
-        # ベース（Utility用）とそのラベル
-        if widgets['base'].isVisible():
-            # Utility+Uniqueの場合、ベースは自動設定なのでチェック状態に関わらず無効
-            if widgets['rarity'].currentText() == "Unique" and widgets['flask_type'].currentText() == "Utility":
-                widgets['base'].setEnabled(False)
-            else:
-                widgets['base'].setEnabled(not is_checked)
-            widgets['base_label'].setEnabled(not is_checked)
+        # ベース（Utility用）とそのラベル - 常に処理する
+        # Utility+Uniqueの場合、ベースは自動設定なのでチェック状態に関わらず無効
+        if widgets['rarity'].currentText() == "Unique" and widgets['flask_type'].currentText() == "Utility":
+            widgets['base'].setEnabled(False)
+        else:
+            widgets['base'].setEnabled(not is_checked)
+        widgets['base_label'].setEnabled(not is_checked)
         
         # 持続時間
         widgets['duration'].setEnabled(not is_checked)
+        if 'duration_label' in widgets:
+            widgets['duration_label'].setEnabled(not is_checked)
         
         # チャージフル使用
         widgets['use_when_full'].setEnabled(not is_checked)
-        
-        # すべてのラベルの有効/無効を切り替え
-        if 'flask_type_label' in widgets:
-            widgets['flask_type_label'].setEnabled(not is_checked)
-        
-        if 'duration_label' in widgets:
-            widgets['duration_label'].setEnabled(not is_checked)
         
         # グレーアウト時の視覚的フィードバック
         if is_checked:
@@ -495,10 +490,8 @@ class FlaskTinctureTab(BaseTab):
             
             # ラベルもグレーアウト
             widgets['rarity_label'].setStyleSheet("QLabel { color: gray; }")
-            if widgets['detail_label'].isVisible():
-                widgets['detail_label'].setStyleSheet("QLabel { color: gray; }")
-            if widgets['base_label'].isVisible():
-                widgets['base_label'].setStyleSheet("QLabel { color: gray; }")
+            widgets['detail_label'].setStyleSheet("QLabel { color: gray; }")
+            widgets['base_label'].setStyleSheet("QLabel { color: gray; }")
             if 'flask_type_label' in widgets:
                 widgets['flask_type_label'].setStyleSheet("QLabel { color: gray; }")
             if 'duration_label' in widgets:
@@ -584,8 +577,15 @@ class FlaskTinctureTab(BaseTab):
                 if hasattr(widgets['detail'], 'lineEdit'):
                     widgets['detail'].lineEdit().setPlaceholderText("タイプして検索...")
                 
-                # 最初のアイテムが選択された場合の持続時間を設定
-                if base_types:
+                # 保存された値があればそれを設定、なければ最初のアイテム
+                slot_config = self.config.get('flask_slots', {}).get(f'slot_{slot_num}', {})
+                saved_detail = slot_config.get('detail', '')
+                if saved_detail and not self.is_initializing:
+                    index = widgets['detail'].findText(saved_detail)
+                    if index >= 0:
+                        widgets['detail'].setCurrentIndex(index)
+                        self.on_detail_changed(slot_num, saved_detail)
+                elif base_types:
                     self.on_detail_changed(slot_num, base_types[0])
             else:
                 # その他のMagicフラスコ

@@ -20,6 +20,7 @@ class SkillsTab(BaseTab):
         skills_enabled = self.get_config_value('skills', 'enabled', True)
         self.main_window.skills_enabled_cb.setChecked(skills_enabled)
         self.main_window.skills_enabled_cb.stateChanged.connect(self.on_skills_enabled_changed)
+        self.main_window.skills_enabled_cb.stateChanged.connect(self.save_skills_settings)  # 自動保存を追加
         skills_layout.addWidget(self.main_window.skills_enabled_cb, 0, 0, 1, 2)
         
         # 設定保存ボタン
