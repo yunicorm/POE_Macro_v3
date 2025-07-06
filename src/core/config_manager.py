@@ -17,7 +17,7 @@ class ConfigManager:
         self.config_filename = config_path
         self.config_path = get_config_path(config_path)
         self.config = {}
-        self.user_config_path = get_user_config_path("user_config.yaml")
+        self.user_config_path = Path(get_user_config_path("user_config.yaml"))
         
     def load_config(self) -> Dict[str, Any]:
         """設定ファイルを読み込む"""
@@ -63,9 +63,17 @@ class ConfigManager:
                     logger.debug(f"User config type: {type(user_config)}")
                     logger.debug(f"User config value: {user_config}")
                     if isinstance(user_config, dict):
+                        # flask_slotsの確認を追加
+                        if 'flask_slots' in user_config:
+                            logger.debug(f"User config has flask_slots: {user_config['flask_slots'].keys()}")
                         logger.debug(f"Merging user config...")
                         self._merge_config(self.config, user_config)
                         logger.info(f"Loaded user config from {self.user_config_path}")
+                        # マージ後のflask_slots確認
+                        if 'flask_slots' in self.config:
+                            logger.debug(f"After merge - flask_slots keys: {self.config['flask_slots'].keys()}")
+                        else:
+                            logger.warning("After merge - flask_slots not found in config")
                     else:
                         logger.warning(f"User config is not a dictionary, skipping: {type(user_config)}")
             

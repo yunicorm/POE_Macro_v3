@@ -109,7 +109,12 @@ class FlaskTinctureTab(BaseTab):
         slot_widgets = {}
         
         # 保存された設定を読み込み
+        # デバッグ: flask_slotsの存在確認
+        if 'flask_slots' not in self.config:
+            logger.warning(f"flask_slots not found in config. Available keys: {list(self.config.keys())}")
+        
         slot_config = self.config.get('flask_slots', {}).get(f'slot_{slot_num}', {})
+        logger.debug(f"Loading slot_{slot_num} config: {slot_config}")
         
         # 保存された持続時間を記録
         saved_duration = slot_config.get('duration_seconds', 5.0)
