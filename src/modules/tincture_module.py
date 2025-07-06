@@ -138,7 +138,7 @@ class TinctureModule:
                 
                 if current_state == "ACTIVE":
                     # Active状態の場合は何もしない（維持する）
-                    logger.debug("Tincture is ACTIVE - maintaining state")
+                    logger.debug("Tincture is ACTIVE - maintaining state, no action needed")
                     self.stats['active_detections'] += 1
                     
                 elif current_state == "IDLE":
@@ -147,7 +147,7 @@ class TinctureModule:
                     time_since_last_use = current_time - self.last_use_time
                     
                     if time_since_last_use >= self.min_use_interval:
-                        logger.info(f"Tincture IDLE detected! Using tincture (key: {self.key})")
+                        logger.info(f"Tincture IDLE detected! Using tincture (key: {self.key}) - last use: {time_since_last_use:.2f}s ago")
                         success = self._use_tincture()
                         
                         if success:
@@ -159,15 +159,17 @@ class TinctureModule:
                             self.stats['last_use_timestamp'] = current_time
                             
                             logger.info(f"Tincture used successfully. Total uses: {self.stats['total_uses']}")
-                        
-                        # 使用後の待機も高速チェック対応
-                        logger.debug("Waiting 2 seconds for tincture to become active...")
-                        # 2秒を200回に分割して高速チェック
-                        for _ in range(200):
-                            if not self.running:
-                                logger.debug("Tincture: Fast stop during wait")
-                                break
-                            time.sleep(0.01)  # 10ms間隔
+                            
+                            # 使用後はより長い待機を設定（Active状態になるまで待つ）
+                            logger.debug("Waiting 3-4 seconds for tincture to become active...")
+                            # 3.5秒を350回に分割して高速チェック
+                            for _ in range(350):
+                                if not self.running:
+                                    logger.debug("Tincture: Fast stop during post-use wait")
+                                    break
+                                time.sleep(0.01)  # 10ms間隔
+                        else:
+                            logger.warning("Tincture use failed")
                     else:
                         logger.debug(f"Skipping use - minimum interval not met ({time_since_last_use:.2f}s < {self.min_use_interval}s)")
                         self.stats['idle_detections'] += 1

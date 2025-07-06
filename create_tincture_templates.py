@@ -68,6 +68,32 @@ try:
     
     print("Tincture状態別テンプレート画像の作成を開始します...")
     
+    # 既存テンプレートの存在チェック
+    existing_templates = []
+    for state_name in states.keys():
+        state_dir = base_dir / state_name
+        if state_dir.exists():
+            for template_file in state_dir.glob("*.png"):
+                if template_file.stat().st_size > 1000:  # 1KB以上のファイルは実際のテンプレートと判断
+                    existing_templates.append(str(template_file))
+    
+    if existing_templates:
+        print(f"\n警告: 既存のテンプレート画像が {len(existing_templates)} 個見つかりました:")
+        for template in existing_templates[:5]:  # 最初の5個だけ表示
+            print(f"  - {template}")
+        if len(existing_templates) > 5:
+            print(f"  ... および他 {len(existing_templates) - 5} 個")
+        
+        print("\n既存のテンプレートを上書きしますか？")
+        print("注意: 実際のゲーム画面から作成したテンプレートが失われる可能性があります。")
+        response = input("上書きする場合は 'yes' を入力してください: ")
+        
+        if response.lower() != 'yes':
+            print("処理を中止しました。既存のテンプレートは保持されます。")
+            exit(0)
+        else:
+            print("既存のテンプレートを上書きします...")
+    
     for state_name, state_config in states.items():
         print(f"\n{state_name.upper()} 状態のテンプレート作成中...")
         

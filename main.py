@@ -86,7 +86,7 @@ def test_modules():
     return True
 
 def main():
-    """メイン関数"""
+    """メイン関数（詳細デバッグログ付き）"""
     # コマンドライン引数の解析
     parser = argparse.ArgumentParser(description='POE Macro v3.0')
     parser.add_argument('--no-gui', action='store_true', help='Run without GUI')
@@ -97,6 +97,47 @@ def main():
     # ログ設定
     setup_logging(args.debug)
     logger = logging.getLogger(__name__)
+    
+    # 起動時の詳細情報をログ出力
+    logger.info("=" * 60)
+    logger.info("POE Macro v3.0 Starting Up")
+    logger.info("=" * 60)
+    logger.info(f"Command line arguments: {vars(args)}")
+    logger.info(f"Python path: {sys.path[0]}")
+    logger.info(f"Working directory: {Path.cwd()}")
+    logger.info(f"Script location: {Path(__file__).parent}")
+    
+    # システム情報
+    import platform
+    logger.info(f"Platform: {platform.system()} {platform.release()}")
+    logger.info(f"Python: {sys.version}")
+    
+    # 重要なファイル・ディレクトリの存在確認
+    important_paths = [
+        "config/user_config.yaml",
+        "assets/images/tincture",
+        "src/core",
+        "src/modules",
+        "src/features"
+    ]
+    
+    logger.info("Checking important paths:")
+    for path in important_paths:
+        path_obj = Path(path)
+        exists = path_obj.exists()
+        path_type = "directory" if path_obj.is_dir() else "file" if path_obj.is_file() else "unknown"
+        logger.info(f"  {path}: {'✓' if exists else '✗'} ({path_type})")
+    
+    # 設定ファイルの詳細チェック
+    config_path = Path("config/user_config.yaml")
+    if config_path.exists():
+        try:
+            size = config_path.stat().st_size
+            logger.info(f"Config file size: {size} bytes")
+        except Exception as e:
+            logger.warning(f"Could not read config file stats: {e}")
+    
+    logger.info("-" * 60)
     
     logger.info("Starting POE Macro v3.0...")
     

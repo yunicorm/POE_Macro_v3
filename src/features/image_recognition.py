@@ -347,26 +347,49 @@ class TinctureDetector:
             return False
     
     def get_tincture_state(self) -> str:
-        """Tincture の現在の状態を取得"""
+        """Tincture の現在の状態を取得（詳細ログ付き）"""
         try:
-            logger.debug("Checking tincture state...")
+            logger.debug("=== Starting Tincture State Detection ===")
+            
+            # テンプレートの状態を確認
+            active_available = self.template_active is not None
+            idle_available = self.template_idle is not None
+            
+            logger.debug(f"Template availability: Active={active_available}, Idle={idle_available}")
+            
+            if not idle_available:
+                logger.error("Idle template not available - cannot perform detection")
+                return "ERROR"
             
             # Active状態をチェック（優先）
-            if self.detect_tincture_active():
-                logger.debug("Tincture state determined: ACTIVE")
-                return "ACTIVE"
+            if active_available:
+                logger.debug("Checking ACTIVE state first (priority detection)...")
+                active_detected = self.detect_tincture_active()
+                if active_detected:
+                    logger.info("Tincture state determined: ACTIVE (priority check successful)")
+                    return "ACTIVE"
+                else:
+                    logger.debug("ACTIVE state not detected, proceeding to IDLE check")
+            else:
+                logger.warning("Active template not available - skipping ACTIVE detection")
             
             # Idle状態をチェック
-            if self.detect_tincture_idle():
-                logger.debug("Tincture state determined: IDLE")
+            logger.debug("Checking IDLE state...")
+            idle_detected = self.detect_tincture_idle()
+            if idle_detected:
+                logger.info("Tincture state determined: IDLE")
                 return "IDLE"
+            else:
+                logger.debug("IDLE state not detected")
             
             # どちらも検出されない場合
-            logger.debug("Tincture state determined: UNKNOWN")
+            logger.debug("Tincture state determined: UNKNOWN (no templates matched)")
             return "UNKNOWN"
             
         except Exception as e:
             logger.error(f"Error determining tincture state: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return "ERROR"
     
     def get_detection_area_info(self) -> Dict[str, any]:

@@ -36,6 +36,10 @@ class MainWindow(QMainWindow):
         # ログテキスト要素を早期初期化（安全性のため）
         self.log_text = None
         
+        # キャリブレーション関連の初期化
+        self.area_selector = None
+        self.overlay_window = None
+        
         # キャリブレーションヘルパーの初期化
         self.calibration_helper = CalibrationHelpers(self)
         

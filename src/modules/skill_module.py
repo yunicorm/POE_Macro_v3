@@ -36,6 +36,11 @@ class SkillModule:
         if self.running:
             logger.warning("Skill module already running")
             return
+        
+        # スキルモジュール全体が無効の場合は開始しない
+        if not self.config.get('enabled', False):
+            logger.info("Skill module is disabled, not starting")
+            return
             
         self.running = True
         logger.info("Skill module start signal sent")
@@ -55,6 +60,9 @@ class SkillModule:
                 thread.start()
                 self.threads.append(thread)
                 logger.info(f"Started skill loop for {skill_name}")
+        
+        if not self.threads:
+            logger.info("No skills are enabled for automation")
     
     def stop(self):
         """スキル自動使用を即座停止"""

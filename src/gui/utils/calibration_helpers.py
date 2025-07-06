@@ -15,33 +15,90 @@ class CalibrationHelpers:
     def show_overlay_window(self):
         """オーバーレイウィンドウを表示"""
         try:
-            from src.features.overlay_window import OverlayWindow
-            from src.features.area_selector import AreaSelector
+            self.main_window.log_message("オーバーレイウィンドウを作成中...")
+            logger.info("Starting overlay window creation")
             
+            # 必要なモジュールをインポート
+            try:
+                from src.features.overlay_window import OverlayWindow
+                from src.features.area_selector import AreaSelector
+                logger.debug("Successfully imported OverlayWindow and AreaSelector")
+            except ImportError as ie:
+                error_msg = f"モジュールインポートエラー: {ie}"
+                self.main_window.log_message(error_msg)
+                logger.error(error_msg)
+                return
+            
+            # AreaSelectorの初期化
             if not self.main_window.area_selector:
+                logger.debug("Initializing AreaSelector")
                 self.main_window.area_selector = AreaSelector()
+                self.main_window.log_message("AreaSelectorを初期化しました")
             
-            current_area = self.main_window.area_selector.get_flask_area()
+            # 現在のエリア情報を取得
+            try:
+                current_area = self.main_window.area_selector.get_flask_area()
+                logger.debug(f"Current area: {current_area}")
+                self.main_window.log_message(f"現在のエリア: X={current_area['x']}, Y={current_area['y']}, W={current_area['width']}, H={current_area['height']}")
+            except Exception as ae:
+                error_msg = f"エリア情報取得エラー: {ae}"
+                self.main_window.log_message(error_msg)
+                logger.error(error_msg)
+                return
             
+            # 既存のオーバーレイウィンドウを閉じる
             if self.main_window.overlay_window:
+                logger.debug("Closing existing overlay window")
                 self.main_window.overlay_window.close()
+                self.main_window.overlay_window = None
             
-            self.main_window.overlay_window = OverlayWindow(
-                current_area['x'], current_area['y'], 
-                current_area['width'], current_area['height']
-            )
+            # 新しいオーバーレイウィンドウを作成
+            try:
+                logger.debug("Creating new OverlayWindow")
+                self.main_window.overlay_window = OverlayWindow(
+                    current_area['x'], current_area['y'], 
+                    current_area['width'], current_area['height']
+                )
+                self.main_window.log_message("OverlayWindowを作成しました")
+            except Exception as oe:
+                error_msg = f"OverlayWindow作成エラー: {oe}"
+                self.main_window.log_message(error_msg)
+                logger.error(error_msg)
+                import traceback
+                logger.error(traceback.format_exc())
+                return
             
             # コールバック接続
-            self.main_window.overlay_window.area_changed.connect(self.on_area_changed)
-            self.main_window.overlay_window.settings_saved.connect(self.on_settings_saved)
-            self.main_window.overlay_window.closed.connect(self.on_overlay_closed)
+            try:
+                logger.debug("Connecting overlay callbacks")
+                self.main_window.overlay_window.area_changed.connect(self.on_area_changed)
+                self.main_window.overlay_window.settings_saved.connect(self.on_settings_saved)
+                self.main_window.overlay_window.closed.connect(self.on_overlay_closed)
+                self.main_window.log_message("コールバックを接続しました")
+            except Exception as ce:
+                error_msg = f"コールバック接続エラー: {ce}"
+                self.main_window.log_message(error_msg)
+                logger.error(error_msg)
             
-            self.main_window.overlay_window.show()
-            self.main_window.log_message(f"オーバーレイウィンドウを表示: X={current_area['x']}, Y={current_area['y']}")
+            # オーバーレイウィンドウを表示
+            try:
+                logger.debug("Showing overlay window")
+                self.main_window.overlay_window.show()
+                self.main_window.log_message(f"オーバーレイウィンドウを表示しました: X={current_area['x']}, Y={current_area['y']}")
+                logger.info("Overlay window displayed successfully")
+            except Exception as se:
+                error_msg = f"オーバーレイ表示エラー: {se}"
+                self.main_window.log_message(error_msg)
+                logger.error(error_msg)
+                import traceback
+                logger.error(traceback.format_exc())
             
         except Exception as e:
-            self.main_window.log_message(f"オーバーレイウィンドウ表示エラー: {e}")
-            logger.error(f"Error showing overlay: {e}")
+            error_msg = f"オーバーレイウィンドウ表示エラー: {e}"
+            self.main_window.log_message(error_msg)
+            logger.error(error_msg)
+            import traceback
+            logger.error(traceback.format_exc())
     
     def on_area_changed(self, x, y, width, height):
         """エリア変更時の処理"""

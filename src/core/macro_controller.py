@@ -211,37 +211,65 @@ class MacroController:
                     try:
                         if isinstance(config, dict):
                             enabled = config.get(enabled_key, False)
+                            logger.debug(f"Starting {name} module - enabled: {enabled}, config keys: {list(config.keys())}")
                             if enabled is True or (isinstance(enabled, str) and enabled.lower() == 'true'):
                                 module.start()
-                                logger.info(f"{name} module started")
+                                logger.info(f"✓ {name} module started successfully")
+                                return True
                             else:
-                                logger.info(f"{name} module not started - enabled: {enabled}")
+                                logger.info(f"- {name} module not started - disabled (enabled: {enabled})")
+                                return False
                         else:
-                            logger.info(f"{name} module not started - no valid config")
+                            logger.warning(f"✗ {name} module not started - invalid config type: {type(config)}")
+                            return False
                     except Exception as e:
-                        logger.error(f"Error starting {name} module: {e}")
+                        logger.error(f"✗ Error starting {name} module: {e}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
+                        return False
                 
                 # 並列で開始処理を実行
+                start_results = {}
                 for module, name, config in [
                     (self.flask_module, "Flask", flask_raw),
                     (self.skill_module, "Skill", skills_raw),
                     (self.tincture_module, "Tincture", tincture_raw)
                 ]:
-                    thread = threading.Thread(target=start_module, args=(module, name, config), daemon=True)
+                    def wrapped_start_module(mod, n, cfg):
+                        result = start_module(mod, n, cfg)
+                        start_results[n] = result
+                    
+                    thread = threading.Thread(target=wrapped_start_module, args=(module, name, config), daemon=True)
                     start_threads.append(thread)
                     thread.start()
                 
                 # LogMonitorの開始
+                log_monitor_started = False
                 if self.log_monitor:
                     try:
                         self.log_monitor.start()
-                        logger.info("LogMonitor started")
+                        logger.info("✓ LogMonitor started successfully")
+                        log_monitor_started = True
                     except Exception as e:
-                        logger.error(f"Failed to start LogMonitor: {e}")
+                        logger.error(f"✗ Failed to start LogMonitor: {e}")
                 
                 # 全スレッドの完了を待機（最大1.5秒）
                 for thread in start_threads:
                     thread.join(timeout=0.5)
+                
+                # 起動サマリーをログ出力
+                logger.info("=" * 50)
+                logger.info("Module Startup Summary:")
+                logger.info("=" * 50)
+                for module_name, success in start_results.items():
+                    status = "✓ STARTED" if success else "- DISABLED/FAILED"
+                    logger.info(f"{module_name:<12}: {status}")
+                logger.info(f"{'LogMonitor':<12}: {'✓ STARTED' if log_monitor_started else '✗ FAILED'}")
+                
+                successful_modules = sum(start_results.values()) + (1 if log_monitor_started else 0)
+                total_modules = len(start_results) + 1
+                logger.info(f"Started {successful_modules}/{total_modules} modules successfully")
+                logger.info("=" * 50)
                 
                 logger.info("MacroController background start completed")
                 
