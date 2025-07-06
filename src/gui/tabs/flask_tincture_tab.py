@@ -131,7 +131,7 @@ class FlaskTinctureTab(BaseTab):
         # Tinctureチェックボックス
         tincture_cb = QCheckBox("Tincture")
         tincture_cb.setChecked(slot_config.get('is_tincture', False))
-        tincture_cb.stateChanged.connect(lambda state: self.on_tincture_checked(slot_num, state))
+        tincture_cb.stateChanged.connect(lambda state, s=slot_num: self.on_tincture_checked(s, state))
         slot_widgets['is_tincture'] = tincture_cb
         layout.addWidget(tincture_cb, 0, 2)
         
@@ -247,10 +247,9 @@ class FlaskTinctureTab(BaseTab):
         self.is_initializing = False
         duration_spinbox.setValue(saved_duration)
         
-        # Tinctureスロットの場合はキー割り当て更新
+        # 初期状態でTinctureがチェックされている場合、グレーアウトを適用
         if slot_config.get('is_tincture', False):
-            # 他のスロット作成後にキー割り当てを更新するため、後で呼び出す
-            pass
+            self.on_tincture_checked(slot_num, Qt.Checked)
         
         return slot_group
     
@@ -448,6 +447,9 @@ class FlaskTinctureTab(BaseTab):
         is_checked = state == Qt.Checked
         widgets = self.flask_slot_widgets[slot_num]
         
+        self.logger.debug(f"on_tincture_checked called: slot={slot_num}, is_checked={is_checked}")
+        self.logger.debug(f"widgets keys: {list(widgets.keys())}")
+        
         # フラスコ設定項目の有効/無効を切り替え
         # フラスコ属性（Life, Mana, Hybrid, Utility, Wine）
         widgets['flask_type'].setEnabled(not is_checked)
@@ -478,24 +480,59 @@ class FlaskTinctureTab(BaseTab):
         # チャージフル使用
         widgets['use_when_full'].setEnabled(not is_checked)
         
+        # setEnabled()の後に追加
+        self.logger.debug(f"flask_type.isEnabled(): {widgets['flask_type'].isEnabled()}")
+        
         # グレーアウト時の視覚的フィードバック
         if is_checked:
+            # より視覚的に分かりやすいスタイル
+            disabled_style = """
+            QComboBox { 
+                color: #808080; 
+                background-color: #f0f0f0;
+                border: 1px solid #d0d0d0;
+            }
+            QComboBox:disabled {
+                color: #808080;
+                background-color: #f0f0f0;
+            }
+            """
+            disabled_spinbox_style = """
+            QDoubleSpinBox { 
+                color: #808080; 
+                background-color: #f0f0f0;
+                border: 1px solid #d0d0d0;
+            }
+            QDoubleSpinBox:disabled {
+                color: #808080;
+                background-color: #f0f0f0;
+            }
+            """
+            disabled_checkbox_style = """
+            QCheckBox { 
+                color: #808080; 
+            }
+            QCheckBox:disabled {
+                color: #808080;
+            }
+            """
+            
             # Tinctureチェック時：グレーアウトスタイルを適用
-            widgets['flask_type'].setStyleSheet("QComboBox { color: gray; }")
-            widgets['rarity'].setStyleSheet("QComboBox { color: gray; }")
-            widgets['detail'].setStyleSheet("QComboBox { color: gray; }")
-            widgets['base'].setStyleSheet("QComboBox { color: gray; }")
-            widgets['duration'].setStyleSheet("QDoubleSpinBox { color: gray; }")
-            widgets['use_when_full'].setStyleSheet("QCheckBox { color: gray; }")
+            widgets['flask_type'].setStyleSheet(disabled_style)
+            widgets['rarity'].setStyleSheet(disabled_style)
+            widgets['detail'].setStyleSheet(disabled_style)
+            widgets['base'].setStyleSheet(disabled_style)
+            widgets['duration'].setStyleSheet(disabled_spinbox_style)
+            widgets['use_when_full'].setStyleSheet(disabled_checkbox_style)
             
             # ラベルもグレーアウト
-            widgets['rarity_label'].setStyleSheet("QLabel { color: gray; }")
-            widgets['detail_label'].setStyleSheet("QLabel { color: gray; }")
-            widgets['base_label'].setStyleSheet("QLabel { color: gray; }")
+            widgets['rarity_label'].setStyleSheet("QLabel { color: #808080; }")
+            widgets['detail_label'].setStyleSheet("QLabel { color: #808080; }")
+            widgets['base_label'].setStyleSheet("QLabel { color: #808080; }")
             if 'flask_type_label' in widgets:
-                widgets['flask_type_label'].setStyleSheet("QLabel { color: gray; }")
+                widgets['flask_type_label'].setStyleSheet("QLabel { color: #808080; }")
             if 'duration_label' in widgets:
-                widgets['duration_label'].setStyleSheet("QLabel { color: gray; }")
+                widgets['duration_label'].setStyleSheet("QLabel { color: #808080; }")
         else:
             # Tinctureチェック解除時：通常スタイルに戻す
             widgets['flask_type'].setStyleSheet("")

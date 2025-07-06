@@ -21,6 +21,8 @@ class SkillModule:
             config = {'enabled': False}  # フォールバック設定
         
         self.config = config
+        logger.debug(f"SkillModule initialized with config: {config}")
+        logger.debug(f"Config 'enabled' value: {config.get('enabled', 'NOT FOUND')}")
         self.keyboard = KeyboardController()
         self.running = False
         self.threads = []
@@ -33,6 +35,9 @@ class SkillModule:
         
     def start(self):
         """スキル自動使用を高速開始"""
+        logger.debug(f"SkillModule.start() - config: {self.config}")
+        logger.debug(f"SkillModule.start() - enabled: {self.config.get('enabled', False)}")
+        
         if self.running:
             logger.warning("Skill module already running")
             return
