@@ -209,14 +209,22 @@ def run_headless(macro_controller):
 
 def run_gui(config_manager, macro_controller):
     """GUIモードで実行（修正版）"""
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)  # tryブロックの前に移動
     
     try:
+        logger.info("run_gui開始 - loggerが正常に初期化されました")
+        
         # GUI アプリケーションの準備
+        logger.info("QApplicationを初期化中...")
         app = QApplication(sys.argv)
+        logger.info("QApplicationが正常に初期化されました")
         
         # ステータスオーバーレイを作成（設定から位置を読み込む）
-        from src.features.status_overlay import StatusOverlay
+        try:
+            from src.features.status_overlay import StatusOverlay
+        except ImportError as import_error:
+            logger.error(f"StatusOverlayのimportに失敗: {import_error}")
+            raise
         overlay_config = config_manager.config.get('overlay', {}).get('status_position', {})
         font_size = config_manager.config.get('overlay', {}).get('font_size', 16)
         
@@ -229,6 +237,8 @@ def run_gui(config_manager, macro_controller):
         
         # 位置変更時の自動保存機能
         def on_position_changed(x, y):
+            # nested function内でloggerを明示的に取得
+            local_logger = logging.getLogger(__name__)
             try:
                 if 'overlay' not in config_manager.config:
                     config_manager.config['overlay'] = {}
@@ -238,9 +248,9 @@ def run_gui(config_manager, macro_controller):
                 config_manager.config['overlay']['status_position']['x'] = x
                 config_manager.config['overlay']['status_position']['y'] = y
                 config_manager.save_config(config_manager.config)
-                logger.info(f"オーバーレイ位置を保存しました: X={x}, Y={y}")
+                local_logger.info(f"オーバーレイ位置を保存しました: X={x}, Y={y}")
             except Exception as e:
-                logger.error(f"オーバーレイ位置保存エラー: {e}")
+                local_logger.error(f"オーバーレイ位置保存エラー: {e}")
         
         status_overlay.position_changed.connect(on_position_changed)
         status_overlay.show()
