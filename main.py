@@ -246,7 +246,7 @@ def run_gui(config_manager, macro_controller):
         macro_controller.set_status_overlay(status_overlay)
         
         # MainWindowを起動
-        from gui.main_window import MainWindow
+        from src.gui.main_window import MainWindow
         main_window = MainWindow(config_manager, macro_controller)
         
         # 右モニター検出と位置設定

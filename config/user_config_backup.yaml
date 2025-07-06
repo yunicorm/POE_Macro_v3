@@ -1,0 +1,136 @@
+flask:
+  enabled: false
+  slot_1:
+    duration: 7.2
+    enabled: true
+    key: '1'
+    loop_delay:
+    - 7.21
+    - 7.3
+    name: Granite Flask
+  slot_2:
+    duration: 7.2
+    enabled: true
+    key: '2'
+    loop_delay:
+    - 7.21
+    - 7.3
+    name: Cinderswallow Urn
+  slot_4:
+    duration: 20.0
+    enabled: true
+    key: '4'
+    loop_delay:
+    - 20.0
+    - 21.0
+    name: Wine of the Prophet
+  slot_5:
+    duration: 5.0
+    enabled: true
+    key: '5'
+    loop_delay:
+    - 4.5
+    - 4.8
+    name: Divine Mana Flask
+flask_slots:
+  slot_1:
+    base: ''
+    detail: Granite Flask
+    duration_ms: 7200
+    duration_seconds: 7.2
+    flask_type: Utility
+    is_tincture: false
+    key: '1'
+    rarity: Magic
+    use_when_full: false
+  slot_2:
+    base: ''
+    detail: Divination Distillate
+    duration_ms: 5000
+    duration_seconds: 5.0
+    flask_type: Hybrid
+    is_tincture: false
+    key: '2'
+    rarity: Unique
+    use_when_full: true
+general:
+  auto_start_on_launch: false
+  debug_mode: false
+  language: ja
+  log_level: INFO
+  respect_grace_period: true
+grace_period:
+  clear_cache_on_reenter: true
+  duration: 60
+  enabled: true
+  trigger_inputs:
+    keyboard_keys:
+    - q
+    mouse_buttons:
+    - left
+    - right
+    - middle
+hotkeys:
+  emergency_stop: F12
+  flask_1: '1'
+  flask_2: '2'
+  flask_3: '3'
+  flask_4: '4'
+  flask_5: '5'
+  toggle_macro: F1
+log_monitor:
+  check_interval: 0.5
+  enabled: true
+  log_path: C:/Program Files (x86)/Steam/steamapps/common/Path of Exile/logs/Client.txt
+overlay:
+  font_size: 16
+  status_position:
+    height: 40
+    width: 150
+    x: 1720
+    y: 1050
+screen_capture:
+  capture_area:
+    height: 1080
+    width: 1920
+    x: 0
+    y: 0
+  monitor_index: 0
+skills:
+  berserk:
+    enabled: true
+    interval:
+    - 0.3
+    - 1.0
+    key: e
+  enabled: false
+  molten_shell:
+    enabled: true
+    interval:
+    - 0.3
+    - 1.0
+    key: r
+  order_to_me:
+    enabled: true
+    interval:
+    - 3.5
+    - 4.0
+    key: t
+tincture:
+  auto_slot3_config:
+    height: 120
+    width: 80
+    x: 1680
+    y: 1133
+  check_interval: 0.1
+  detection_area:
+    height: 160
+    width: 398
+    x: 914
+    y: 1279
+  detection_mode: full_flask_area
+  enabled: false
+  key: '3'
+  min_use_interval: 0.5
+  monitor_config: Primary
+  sensitivity: 0.7

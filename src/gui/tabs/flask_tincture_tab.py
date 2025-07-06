@@ -736,6 +736,13 @@ class FlaskTinctureTab(BaseTab):
         try:
             widgets = self.flask_slot_widgets[slot_num]
             
+            # デバッグ: 保存前のconfig内容を確認
+            print(f"[DEBUG] 保存前のconfig keys: {list(self.config.keys())}")
+            if 'flask_slots' in self.config:
+                print(f"[DEBUG] 保存前のflask_slots: {list(self.config['flask_slots'].keys())}")
+            else:
+                print(f"[DEBUG] 保存前にflask_slotsが存在しません")
+            
             # スロット設定を収集
             slot_config = {
                 'key': widgets['key'].text(),
@@ -749,6 +756,9 @@ class FlaskTinctureTab(BaseTab):
                 'use_when_full': widgets['use_when_full'].isChecked()
             }
             
+            # デバッグ: 保存するスロット設定を出力
+            print(f"[DEBUG] スロット{slot_num}保存設定: {slot_config}")
+            
             # 設定の検証
             is_valid, error_msg = self.validate_slot_config(slot_config)
             if not is_valid:
@@ -760,13 +770,21 @@ class FlaskTinctureTab(BaseTab):
                 self.config['flask_slots'] = {}
             
             self.config['flask_slots'][f'slot_{slot_num}'] = slot_config
+            
+            # デバッグ: config_manager.save_config呼び出し前
+            print(f"[DEBUG] save_config呼び出し前のflask_slots: {self.config['flask_slots']}")
+            
             self.config_manager.save_config(self.config)
+            
+            # デバッグ: save_config呼び出し後の確認
+            print(f"[DEBUG] save_config呼び出し完了")
             
             self.log_info(f"スロット{slot_num}の設定を保存しました")
             return True
             
         except Exception as e:
             self.log_info(f"スロット{slot_num}設定保存エラー: {e}")
+            print(f"[DEBUG] 保存エラー: {e}")
             return False
     
     def save_all_settings(self):

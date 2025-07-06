@@ -81,6 +81,15 @@ class ConfigManager:
             logger.debug(f"Final config type: {type(self.config)}")
             logger.debug(f"Returning config with keys: {list(self.config.keys()) if isinstance(self.config, dict) else 'Not a dict'}")
             
+            # デバッグ: load_config完了時の最終config確認
+            print(f"[DEBUG] ConfigManager.load_config - 最終config keys: {list(self.config.keys())}")
+            if 'flask_slots' in self.config:
+                print(f"[DEBUG] ConfigManager.load_config - 最終flask_slots: {list(self.config['flask_slots'].keys())}")
+                for slot_name, slot_data in self.config['flask_slots'].items():
+                    print(f"[DEBUG]   {slot_name}: key={slot_data.get('key')}, type={slot_data.get('flask_type')}")
+            else:
+                print(f"[DEBUG] ConfigManager.load_config - flask_slotsが存在しません")
+            
             return self.config
             
         except Exception as e:
@@ -109,10 +118,31 @@ class ConfigManager:
     def save_config(self, config: Dict[str, Any]) -> None:
         """設定を保存（内部設定を更新してユーザー設定として保存）"""
         try:
+            # デバッグ: 保存するconfig全体を出力
+            print(f"[DEBUG] ConfigManager.save_config - 保存するconfig keys: {list(config.keys())}")
+            if 'flask_slots' in config:
+                print(f"[DEBUG] ConfigManager.save_config - flask_slots: {list(config['flask_slots'].keys())}")
+            
+            # デバッグ: user_config.yamlのフルパスを出力
+            print(f"[DEBUG] ConfigManager.save_config - user_config_path: {self.user_config_path}")
+            
             self.config = config
             self.save_user_config()
+            
+            # デバッグ: ファイル書き込み後、ファイルを読み直して内容を確認
+            if self.user_config_path.exists():
+                with open(self.user_config_path, 'r', encoding='utf-8') as f:
+                    saved_content = yaml.safe_load(f)
+                    if 'flask_slots' in saved_content:
+                        print(f"[DEBUG] ファイル書き込み後確認 - flask_slots存在: {list(saved_content['flask_slots'].keys())}")
+                    else:
+                        print(f"[DEBUG] ファイル書き込み後確認 - flask_slotsが存在しません")
+            else:
+                print(f"[DEBUG] user_config.yamlファイルが存在しません")
+                
         except Exception as e:
             logger.error(f"Failed to save config: {e}")
+            print(f"[DEBUG] ConfigManager.save_config エラー: {e}")
             raise
     
     def _merge_config(self, base: Dict, override: Dict) -> None:
