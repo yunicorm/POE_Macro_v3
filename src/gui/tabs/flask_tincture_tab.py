@@ -28,6 +28,16 @@ class FlaskTinctureTab(BaseTab):
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
         
+        # Tincture設定グループを先に作成（experienced_herbalist_cbを含む）
+        tincture_group = self.create_tincture_group()
+        main_layout.addWidget(tincture_group)
+        
+        # セパレーター
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        main_layout.addWidget(separator)
+        
         # フラスコスロット設定グループ
         flask_group = self.create_flask_slots_group()
         main_layout.addWidget(flask_group)
@@ -46,16 +56,6 @@ class FlaskTinctureTab(BaseTab):
         save_button_layout.addWidget(save_all_btn)
         
         main_layout.addLayout(save_button_layout)
-        
-        # セパレーター
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        main_layout.addWidget(separator)
-        
-        # Tincture設定グループ（既存のTinctureタブから移植）
-        tincture_group = self.create_tincture_group()
-        main_layout.addWidget(tincture_group)
         
         # 統計情報グループ
         stats_group = self.create_stats_group()
@@ -94,6 +94,9 @@ class FlaskTinctureTab(BaseTab):
         # (遅延実行でウィジェットが確実に存在するようにする)
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(100, self.update_tincture_key_assignment)
+        
+        # 初期状態でTinctureチェックされているスロットにグレーアウトを適用
+        QTimer.singleShot(150, self.apply_initial_tincture_states)
             
         return group
     
@@ -247,9 +250,7 @@ class FlaskTinctureTab(BaseTab):
         self.is_initializing = False
         duration_spinbox.setValue(saved_duration)
         
-        # 初期状態でTinctureがチェックされている場合、グレーアウトを適用
-        if slot_config.get('is_tincture', False):
-            self.on_tincture_checked(slot_num, Qt.Checked)
+        # 初期状態でのTinctureグレーアウトは後で一括適用するため、ここでは削除
         
         return slot_group
     
@@ -448,7 +449,6 @@ class FlaskTinctureTab(BaseTab):
         widgets = self.flask_slot_widgets[slot_num]
         
         self.logger.debug(f"on_tincture_checked called: slot={slot_num}, is_checked={is_checked}")
-        self.logger.debug(f"widgets keys: {list(widgets.keys())}")
         
         # フラスコ設定項目の有効/無効を切り替え
         # フラスコ属性（Life, Mana, Hybrid, Utility, Wine）
@@ -555,14 +555,19 @@ class FlaskTinctureTab(BaseTab):
             if widgets['rarity'].currentText() == "Unique" and widgets['flask_type'].currentText() == "Utility":
                 widgets['base'].setEnabled(False)
         
-        # Tinctureチェック数の検証とキー割り当て更新（既存の処理）
+        # Tinctureチェック数の検証とキー割り当て更新
         if is_checked:
-            # Experienced Herbalistがオフの場合、最大1つまで
-            if not self.main_window.experienced_herbalist_cb.isChecked():
-                self.uncheck_excess_tinctures(1)
+            # experienced_herbalist_cbが存在するか確認
+            if hasattr(self.main_window, 'experienced_herbalist_cb'):
+                # Experienced Herbalistがオフの場合、最大1つまで
+                if not self.main_window.experienced_herbalist_cb.isChecked():
+                    self.uncheck_excess_tinctures(1)
+                else:
+                    # Experienced Herbalistがオンでも最大2つまで
+                    self.uncheck_excess_tinctures(2)
             else:
-                # Experienced Herbalistがオンでも最大2つまで
-                self.uncheck_excess_tinctures(2)
+                # 初期化中の場合は1つまでに制限
+                self.uncheck_excess_tinctures(1)
         
         # キー割り当て表示を更新
         self.update_tincture_key_assignment()
@@ -735,6 +740,12 @@ class FlaskTinctureTab(BaseTab):
         else:
             # Tincture 2が無効になった場合、関連するスロットのチェックを外す
             self.uncheck_excess_tinctures(1)
+    
+    def apply_initial_tincture_states(self):
+        """初期状態でTinctureチェックされているスロットにグレーアウトを適用"""
+        for slot_num, widgets in self.flask_slot_widgets.items():
+            if widgets['is_tincture'].isChecked():
+                self.on_tincture_checked(slot_num, Qt.Checked)
     
     def update_tincture_key_assignment(self):
         """Tinctureのキー割り当てを更新"""
