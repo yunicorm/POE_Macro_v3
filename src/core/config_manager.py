@@ -18,6 +18,7 @@ class ConfigManager:
         self.config_path = get_config_path(config_path)
         self.config = {}
         self.user_config_path = Path(get_user_config_path("user_config.yaml"))
+        logger.debug(f"ConfigManager initialized with config_path: {self.config_path}")
         
     def load_config(self) -> Dict[str, Any]:
         """設定ファイルを読み込む"""

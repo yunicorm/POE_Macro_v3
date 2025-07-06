@@ -21,6 +21,9 @@ from utils.keyboard_input import KeyboardController
 from utils.screen_capture import ScreenCapture
 from utils.image_recognition import ImageRecognition
 
+# ロガーの設定
+logger = logging.getLogger(__name__)
+
 def setup_logging(debug_mode=False):
     """ログ設定"""
     # Tincture動作確認のためDEBUGレベルに設定
@@ -105,7 +108,7 @@ def main():
     
     try:
         # 設定マネージャーの初期化
-        config_path = args.config if args.config else 'config/default_config.yaml'
+        config_path = args.config if args.config else 'default_config.yaml'
         config_manager = ConfigManager(config_path)
         logger.info(f"Using config file: {config_path}")
         
